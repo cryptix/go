@@ -1,3 +1,5 @@
+//go:generate go-bindata -pkg=$GOPACKAGE -prefix=tmpl tmpl/...
+
 // Package templates implements template inheritance and exposes functions to render these
 //
 // inspired by http://elithrar.github.io/article/approximating-html-template-inheritance/
@@ -13,52 +15,43 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/GeertJohan/go.rice"
-	"github.com/cryptix/go/utils"
+	"github.com/cryptix/go/logging"
 	"github.com/gorilla/mux"
 	"github.com/oxtoacart/bpool"
 )
+
+type assetFunc func(name string) ([]byte, error)
 
 var (
 	// Reload is whether to reload templates on each request.
 	Reload bool
 
+	log = logging.Logger("http")
+
+	// asset
+	asset assetFunc
+
 	// files
 	templateFiles     [][]string
 	baseTemplateFiles []string
-
-	basePath  string
-	appRouter *mux.Router
 
 	// all the templates that we parsed
 	templates = map[string]*htmpl.Template{}
 
 	// bufpool is shared between all render() calls
 	bufpool = bpool.NewBufferPool(64)
-
-	// go.rice box for loading templates
-	tmplBox *rice.Box
 )
 
-func SetRiceBox(b *rice.Box) {
-	tmplBox = b
-}
-
-func SetBasePath(p ...string) {
-	if len(p) == 1 {
-		basePath = p[0]
-	} else {
-		basePath = filepath.Join(p...)
-	}
-}
-
-func SetBaseTemplates(files []string) {
+func SetBaseTemplates(fn assetFunc, files []string) {
+	asset = fn
 	baseTemplateFiles = append(baseTemplateFiles, files...)
 }
 
 func AddTemplates(files [][]string) {
 	templateFiles = append(templateFiles, files...)
 }
+
+var appRouter *mux.Router
 
 func SetAppRouter(r *mux.Router) {
 	appRouter = r
@@ -67,21 +60,18 @@ func SetAppRouter(r *mux.Router) {
 // Load loads and parses all templates that are in templateDir
 func Load() {
 	if appRouter == nil {
-		utils.CheckFatal(errors.New("No appRouter set"))
+		logging.CheckFatal(errors.New("No appRouter set"))
 	}
 
 	if len(baseTemplateFiles) == 0 {
 		baseTemplateFiles = []string{"navbar.tmpl", "base.tmpl"}
 	}
 
-	if tmplBox == nil {
-		utils.CheckFatal(errors.New("No riceBox set"))
-	}
-	utils.CheckFatal(parseHTMLTemplates(templateFiles))
+	logging.CheckFatal(parseHTMLTemplates())
 }
 
-func parseHTMLTemplates(sets [][]string) error {
-	for _, set := range sets {
+func parseHTMLTemplates() error {
+	for _, set := range templateFiles {
 		t := htmpl.New("")
 		t.Funcs(htmpl.FuncMap{
 			"urlTo": urlTo,
@@ -124,13 +114,13 @@ func Render(w http.ResponseWriter, r *http.Request, name string, status int, dat
 	w.WriteHeader(status)
 	_, err = buf.WriteTo(w)
 	bufpool.Put(buf)
-	utils.LogInfo.Printf("Rendered '%s' Status:%d (took %v)", name, status, time.Since(start))
+	log.Infof("Rendered '%s' Status:%d (took %v)", name, status, time.Since(start))
 	return err
 }
 
 // PlainError helps rendering user errors
 func PlainError(w http.ResponseWriter, statusCode int, err error) {
-	utils.LogErr.Printf("PlainError(%d):%s\n", statusCode, err)
+	log.Errorf("PlainError(%d):%s\n", statusCode, err)
 	http.Error(w, err.Error(), statusCode)
 }
 
@@ -143,16 +133,16 @@ func parseFilesFromBindata(t *htmpl.Template, filenames ...string) error {
 		return errors.New("templates: no files named in call to parseFilesFromBindata")
 	}
 	files := append(filenames, baseTemplateFiles...)
-	utils.LogInfo.Printf("parseFile - %q", files)
+	log.Debugf("parseFile - %q", files)
 	for _, filename := range files {
-		var s string
-		s, err = tmplBox.String(filename)
+		var tmplBytes []byte
+		tmplBytes, err = asset(filename)
 		if err != nil {
-			utils.LogInfo.Printf("parseFile - Error from tmplBox.String() - %v", err)
+			log.Infof("parseFile - Error from Asset() - %v", err)
 			return err
 		}
 
-		name := filepath.Base(filename)
+		var name = filepath.Base(filename)
 		// First template becomes return value if not already defined,
 		// and we use that one for subsequent New calls to associate
 		// all the templates together. Also, if this file has the same name
@@ -168,7 +158,7 @@ func parseFilesFromBindata(t *htmpl.Template, filenames ...string) error {
 		} else {
 			tmpl = t.New(name)
 		}
-		_, err = tmpl.Parse(s)
+		_, err = tmpl.Parse(string(tmplBytes))
 		if err != nil {
 			return err
 		}
@@ -179,7 +169,7 @@ func parseFilesFromBindata(t *htmpl.Template, filenames ...string) error {
 func urlTo(routeName string, ps ...interface{}) *url.URL {
 	route := appRouter.Get(routeName)
 	if route == nil {
-		utils.LogErr.Printf("no such route: %q (params: %v)", routeName, ps)
+		log.Warningf("no such route: %q (params: %v)", routeName, ps)
 		return &url.URL{}
 	}
 
@@ -194,14 +184,14 @@ func urlTo(routeName string, ps ...interface{}) *url.URL {
 			params = append(params, strconv.FormatInt(v, 10))
 
 		default:
-			utils.LogErr.Printf("invalid param type %v in route %q", p, routeName)
-			utils.CheckFatal(errors.New("invalid param"))
+			log.Errorf("invalid param type %v in route %q", p, routeName)
+			logging.CheckFatal(errors.New("invalid param"))
 		}
 	}
 
 	u, err := route.URLPath(params...)
 	if err != nil {
-		utils.LogErr.Printf("Route error: failed to make URL for route %q (params: %v): %s", routeName, params, err)
+		log.Errorf("Route error: failed to make URL for route %q (params: %v): %s", routeName, params, err)
 		return &url.URL{}
 	}
 	return u

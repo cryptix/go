@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"runtime/debug"
-
-	"github.com/cryptix/go/utils"
 )
 
-type Binary func(resp http.ResponseWriter, req *http.Request) error
+type BinaryHandler func(resp http.ResponseWriter, req *http.Request) error
 
-func (h Binary) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+func (h BinaryHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Description", "File Transfer")
 	resp.Header().Set("Content-Transfer-Encoding", "binary")
 	runBinaryHandler(resp, req, h)
@@ -22,7 +20,7 @@ func runBinaryHandler(w http.ResponseWriter, r *http.Request, fn func(http.Respo
 
 	defer func() {
 		if rv := recover(); rv != nil {
-			err = errors.New("Html panic")
+			err = errors.New("Handler panic")
 			logError(r, err, rv)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
@@ -35,10 +33,10 @@ func runBinaryHandler(w http.ResponseWriter, r *http.Request, fn func(http.Respo
 	}
 }
 
-// Html wrapps a htpp.HandlerFunc-like function with an error return value
-type Html func(resp http.ResponseWriter, req *http.Request) error
+// Handler wrapps a htpp.HandlerFunc-like function with an error return value
+type Handler func(resp http.ResponseWriter, req *http.Request) error
 
-func (h Html) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+func (h Handler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if Reload {
 		Load()
 	}
@@ -50,7 +48,7 @@ func runHandler(w http.ResponseWriter, r *http.Request, fn func(http.ResponseWri
 
 	defer func() {
 		if rv := recover(); rv != nil {
-			err = errors.New("Html panic")
+			err = errors.New("Handler panic")
 			logError(r, err, rv)
 			handleError(w, r, http.StatusInternalServerError, err)
 		}
@@ -87,7 +85,7 @@ func logError(req *http.Request, err error, rv interface{}) {
 			fmt.Fprintln(buf, rv)
 			buf.Write(debug.Stack())
 		}
-		utils.LogErr.Println(buf.String())
+		log.Error(buf.String())
 		bufpool.Put(buf)
 	}
 }
