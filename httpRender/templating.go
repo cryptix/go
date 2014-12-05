@@ -1,9 +1,7 @@
-//go:generate go-bindata -pkg=$GOPACKAGE -prefix=tmpl tmpl/...
-
 // Package templates implements template inheritance and exposes functions to render these
 //
 // inspired by http://elithrar.github.io/article/approximating-html-template-inheritance/
-package httpHandler
+package httpRender
 
 import (
 	"errors"
@@ -32,7 +30,7 @@ var (
 	asset assetFunc
 
 	// files
-	templateFiles     [][]string
+	templateFiles     []string
 	baseTemplateFiles []string
 
 	// all the templates that we parsed
@@ -47,7 +45,7 @@ func SetBaseTemplates(fn assetFunc, files []string) {
 	baseTemplateFiles = append(baseTemplateFiles, files...)
 }
 
-func AddTemplates(files [][]string) {
+func AddTemplates(files []string) {
 	templateFiles = append(templateFiles, files...)
 }
 
@@ -71,23 +69,23 @@ func Load() {
 }
 
 func parseHTMLTemplates() error {
-	for _, set := range templateFiles {
+	for _, file := range templateFiles {
 		t := htmpl.New("")
 		t.Funcs(htmpl.FuncMap{
 			"urlTo": urlTo,
 			"itoa":  strconv.Itoa,
 		})
 
-		err := parseFilesFromBindata(t, set...)
+		err := parseFilesFromBindata(t, file)
 		if err != nil {
-			return fmt.Errorf("template %v: %s", set, err)
+			return fmt.Errorf("template %v: %s", file, err)
 		}
 
 		t = t.Lookup("base")
 		if t == nil {
-			return fmt.Errorf("base template not found in %v", set)
+			return fmt.Errorf("base template not found in %v", file)
 		}
-		templates[set[0]] = t
+		templates[file] = t
 	}
 	return nil
 }
@@ -132,7 +130,7 @@ func parseFilesFromBindata(t *htmpl.Template, filenames ...string) error {
 		// Not really a problem, but be consistent.
 		return errors.New("templates: no files named in call to parseFilesFromBindata")
 	}
-	files := append(filenames, baseTemplateFiles...)
+	files := append(baseTemplateFiles, filenames...)
 	log.Debugf("parseFile - %q", files)
 	for _, filename := range files {
 		var tmplBytes []byte

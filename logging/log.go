@@ -31,7 +31,7 @@ func CheckFatal(err error) {
 			dotName := filepath.Ext(fn.Name())
 			fnName = strings.TrimLeft(dotName, ".") + "()"
 		}
-		log.Criticalf("%s:%d %s\n", file, line, fnName)
+		log.Criticalf("%s:%d %s", file, line, fnName)
 		log.Critical("Fatal Error:", err.Error())
 
 		os.Exit(1)

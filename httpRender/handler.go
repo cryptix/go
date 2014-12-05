@@ -1,4 +1,4 @@
-package httpHandler
+package httpRender
 
 import (
 	"errors"
@@ -7,9 +7,9 @@ import (
 	"runtime/debug"
 )
 
-type BinaryHandler func(resp http.ResponseWriter, req *http.Request) error
+type Binary func(resp http.ResponseWriter, req *http.Request) error
 
-func (h BinaryHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+func (h Binary) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Description", "File Transfer")
 	resp.Header().Set("Content-Transfer-Encoding", "binary")
 	runBinaryHandler(resp, req, h)
@@ -20,7 +20,7 @@ func runBinaryHandler(w http.ResponseWriter, r *http.Request, fn func(http.Respo
 
 	defer func() {
 		if rv := recover(); rv != nil {
-			err = errors.New("Handler panic")
+			err = errors.New("binaryHandler panic")
 			logError(r, err, rv)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
@@ -33,22 +33,22 @@ func runBinaryHandler(w http.ResponseWriter, r *http.Request, fn func(http.Respo
 	}
 }
 
-// Handler wrapps a htpp.HandlerFunc-like function with an error return value
-type Handler func(resp http.ResponseWriter, req *http.Request) error
+// Html wrapps a htpp.HandlerFunc-like function with an error return value
+type Html func(resp http.ResponseWriter, req *http.Request) error
 
-func (h Handler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+func (h Html) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if Reload {
 		Load()
 	}
-	runHandler(resp, req, h)
+	runHtmlHandler(resp, req, h)
 }
 
-func runHandler(w http.ResponseWriter, r *http.Request, fn func(http.ResponseWriter, *http.Request) error) {
+func runHtmlHandler(w http.ResponseWriter, r *http.Request, fn func(http.ResponseWriter, *http.Request) error) {
 	var err error
 
 	defer func() {
 		if rv := recover(); rv != nil {
-			err = errors.New("Handler panic")
+			err = errors.New("htmlHandler panic")
 			logError(r, err, rv)
 			handleError(w, r, http.StatusInternalServerError, err)
 		}
@@ -80,7 +80,7 @@ func handleError(w http.ResponseWriter, r *http.Request, status int, err error) 
 func logError(req *http.Request, err error, rv interface{}) {
 	if err != nil {
 		buf := bufpool.Get()
-		fmt.Fprintf(buf, "Error serving %s: %s\n", req.URL, err)
+		fmt.Fprintf(buf, "Error serving %s: %s", req.URL, err)
 		if rv != nil {
 			fmt.Fprintln(buf, rv)
 			buf.Write(debug.Stack())
