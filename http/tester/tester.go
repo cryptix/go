@@ -1,4 +1,4 @@
-package httpTester
+package tester
 
 import (
 	"bytes"

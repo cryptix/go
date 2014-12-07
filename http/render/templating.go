@@ -1,7 +1,7 @@
 // Package templates implements template inheritance and exposes functions to render these
 //
 // inspired by http://elithrar.github.io/article/approximating-html-template-inheritance/
-package httpRender
+package render
 
 import (
 	"errors"

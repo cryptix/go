@@ -1,4 +1,4 @@
-package httpRender
+package render
 
 import (
 	"errors"
