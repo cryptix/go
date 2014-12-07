@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
@@ -23,8 +24,8 @@ func New(mux *http.ServeMux, t *testing.T) *Tester {
 	}
 }
 
-func (t *Tester) GetHTML(uri *url.URL) (*goquery.Document, *httptest.ResponseRecorder) {
-	req, err := http.NewRequest("GET", uri.String(), nil)
+func (t *Tester) GetHTML(u string) (*goquery.Document, *httptest.ResponseRecorder) {
+	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		t.t.Fatal(err)
 	}
@@ -39,10 +40,14 @@ func (t *Tester) GetHTML(uri *url.URL) (*goquery.Document, *httptest.ResponseRec
 	return doc, rw
 }
 
-func (t *Tester) GetBody(uri *url.URL) (rw *httptest.ResponseRecorder) {
-	req, err := http.NewRequest("GET", uri.String(), nil)
+func (t *Tester) GetBody(u string, h *http.Header) (rw *httptest.ResponseRecorder) {
+	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		t.t.Fatal(err)
+	}
+
+	if h != nil {
+		req.Header = *h
 	}
 
 	rw = httptest.NewRecorder()
@@ -50,8 +55,8 @@ func (t *Tester) GetBody(uri *url.URL) (rw *httptest.ResponseRecorder) {
 	return
 }
 
-func (t *Tester) GetJSON(uri *url.URL, v interface{}) (rw *httptest.ResponseRecorder) {
-	req, err := http.NewRequest("GET", uri.String(), nil)
+func (t *Tester) GetJSON(u string, v interface{}) (rw *httptest.ResponseRecorder) {
+	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		t.t.Fatal(err)
 	}
@@ -69,18 +74,30 @@ func (t *Tester) GetJSON(uri *url.URL, v interface{}) (rw *httptest.ResponseReco
 	return
 }
 
-func (t *Tester) SendJSON(uri *url.URL, v interface{}) (rw *httptest.ResponseRecorder) {
+func (t *Tester) SendJSON(u string, v interface{}) (rw *httptest.ResponseRecorder) {
 	blob, err := json.Marshal(v)
 	if err != nil {
 		t.t.Fatal(err)
 	}
 
-	req, err := http.NewRequest("POST", uri.String(), bytes.NewReader(blob))
+	req, err := http.NewRequest("POST", u, bytes.NewReader(blob))
 	if err != nil {
 		t.t.Fatal(err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+
+	rw = httptest.NewRecorder()
+	t.mux.ServeHTTP(rw, req)
+	return
+}
+
+func (t *Tester) PostForm(u string, v url.Values) (rw *httptest.ResponseRecorder) {
+	req, err := http.NewRequest("POST", u, strings.NewReader(v.Encode()))
+	if err != nil {
+		t.t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	rw = httptest.NewRecorder()
 	t.mux.ServeHTTP(rw, req)

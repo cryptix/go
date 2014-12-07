@@ -112,7 +112,7 @@ func Render(w http.ResponseWriter, r *http.Request, name string, status int, dat
 	w.WriteHeader(status)
 	_, err = buf.WriteTo(w)
 	bufpool.Put(buf)
-	log.Infof("Rendered '%s' Status:%d (took %v)", name, status, time.Since(start))
+	log.Infof("Rendered %q Status:%d (took %v)", name, status, time.Since(start))
 	return err
 }
 
@@ -123,20 +123,19 @@ func PlainError(w http.ResponseWriter, statusCode int, err error) {
 }
 
 // copied from template.ParseFiles but dont use ioutil.ReadFile
-func parseFilesFromBindata(t *htmpl.Template, filenames ...string) error {
+func parseFilesFromBindata(t *htmpl.Template, file string) error {
 	var err error
 
-	if len(filenames) == 0 {
-		// Not really a problem, but be consistent.
-		return errors.New("templates: no files named in call to parseFilesFromBindata")
-	}
-	files := append(baseTemplateFiles, filenames...)
+	files := make([]string, len(baseTemplateFiles)+1)
+	files[0] = file
+	copy(files[1:], baseTemplateFiles)
 	log.Debugf("parseFile - %q", files)
+
 	for _, filename := range files {
 		var tmplBytes []byte
 		tmplBytes, err = asset(filename)
 		if err != nil {
-			log.Infof("parseFile - Error from Asset() - %v", err)
+			log.Noticef("parseFile - Error from Asset() - %v", err)
 			return err
 		}
 
