@@ -44,9 +44,10 @@ func NewHandler(a Auther) (ah AuthHandler) {
 			securecookie.GenerateRandomKey(32),
 		),
 		Options: &sessions.Options{
-			Path:     "/",
-			MaxAge:   86400 * 30,
-			Secure:   true,
+			Path:   "/",
+			MaxAge: 86400 * 30,
+			// BUG(Henry): Add flag to toggle SSL-Only
+			// Secure:   true,
 			HttpOnly: true,
 		},
 	}
