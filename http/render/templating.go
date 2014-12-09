@@ -6,11 +6,13 @@ package render
 import (
 	"errors"
 	"fmt"
+	"html"
 	htmpl "html/template"
 	"net/http"
 	"net/url"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cryptix/go/logging"
@@ -74,6 +76,16 @@ func parseHTMLTemplates() error {
 		t.Funcs(htmpl.FuncMap{
 			"urlTo": urlTo,
 			"itoa":  strconv.Itoa,
+			"field": NewField,
+			"option": func(f *Field, val interface{}, label string) htmpl.HTML {
+				selected := ""
+				if f.Flash() == val || (f.Flash() == "" && f.Value() == val) {
+					selected = " selected"
+				}
+
+				return htmpl.HTML(fmt.Sprintf(`<option value="%s"%s>%s</option>`,
+					html.EscapeString(fmt.Sprintf("%v", val)), selected, html.EscapeString(label)))
+			},
 		})
 
 		err := parseFilesFromBindata(t, file)

@@ -63,14 +63,10 @@ func runHtmlHandler(w http.ResponseWriter, r *http.Request, fn func(http.Respons
 
 func handleError(w http.ResponseWriter, r *http.Request, status int, err error) {
 	w.Header().Set("cache-control", "no-cache")
-	err2 := Render(w, r, "error.tmpl", status, &struct {
-		StatusCode int
-		Status     string
-		Err        error
-	}{
-		StatusCode: status,
-		Status:     http.StatusText(status),
-		Err:        err,
+	err2 := Render(w, r, "error.tmpl", status, map[string]interface{}{
+		"StatusCode": status,
+		"Status":     http.StatusText(status),
+		"Err":        err,
 	})
 	if err2 != nil {
 		logError(r, fmt.Errorf("during execution of error template: %s", err2), nil)
