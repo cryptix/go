@@ -85,7 +85,7 @@ func parseHTMLTemplates() error {
 		if t == nil {
 			return fmt.Errorf("base template not found in %v", file)
 		}
-		templates[file] = t
+		templates[strings.TrimPrefix(file, "tmpl/")] = t
 	}
 	return nil
 }
