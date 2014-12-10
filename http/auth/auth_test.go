@@ -67,9 +67,10 @@ func TestLogin_workingLogin(t *testing.T) {
 	}
 	resp := testClient.PostForm("/login", vals)
 	a.Equal(http.StatusFound, resp.Code)
+	a.Equal("/todoRedir", resp.Header().Get("Location"))
 	a.True(called)
 	newCookie := resp.Header().Get("Set-Cookie")
-	a.Contains(newCookie, SessionName)
+	a.Contains(newCookie, sessionName)
 }
 
 func TestLogin_workingLoginAndRestrictedAcc(t *testing.T) {
@@ -93,7 +94,7 @@ func TestLogin_workingLoginAndRestrictedAcc(t *testing.T) {
 	a.Equal(http.StatusFound, resp.Code)
 	a.True(called)
 	newCookie := resp.Header().Get("Set-Cookie")
-	a.Contains(newCookie, SessionName)
+	a.Contains(newCookie, sessionName)
 
 	resp2 := testClient.GetBody("/profile", &http.Header{"Cookie": []string{newCookie}})
 	a.Equal(http.StatusOK, resp2.Code)
