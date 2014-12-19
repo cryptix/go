@@ -1,10 +1,8 @@
 package render
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
-	"runtime/debug"
 )
 
 type Binary func(resp http.ResponseWriter, req *http.Request) error
@@ -12,24 +10,9 @@ type Binary func(resp http.ResponseWriter, req *http.Request) error
 func (h Binary) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Description", "File Transfer")
 	resp.Header().Set("Content-Transfer-Encoding", "binary")
-	runBinaryHandler(resp, req, h)
-}
-
-func runBinaryHandler(w http.ResponseWriter, r *http.Request, fn func(http.ResponseWriter, *http.Request) error) {
-	var err error
-
-	defer func() {
-		if rv := recover(); rv != nil {
-			err = errors.New("binaryHandler panic")
-			logError(r, err, rv)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	}()
-
-	err = fn(w, r)
-	if err != nil {
-		logError(r, err, nil)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err := h(resp, req); err != nil {
+		logError(req, err, nil)
+		http.Error(resp, err.Error(), http.StatusInternalServerError)
 	}
 }
 
@@ -40,24 +23,10 @@ func (h Html) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if Reload {
 		Load()
 	}
-	runHtmlHandler(resp, req, h)
-}
 
-func runHtmlHandler(w http.ResponseWriter, r *http.Request, fn func(http.ResponseWriter, *http.Request) error) {
-	var err error
-
-	defer func() {
-		if rv := recover(); rv != nil {
-			err = errors.New("htmlHandler panic")
-			logError(r, err, rv)
-			handleError(w, r, http.StatusInternalServerError, err)
-		}
-	}()
-
-	err = fn(w, r)
-	if err != nil {
-		logError(r, err, nil)
-		handleError(w, r, http.StatusInternalServerError, err)
+	if err := h(resp, req); err != nil {
+		logError(req, err, nil)
+		handleError(resp, req, http.StatusInternalServerError, err)
 	}
 }
 
@@ -70,18 +39,5 @@ func handleError(w http.ResponseWriter, r *http.Request, status int, err error) 
 	})
 	if err2 != nil {
 		logError(r, fmt.Errorf("during execution of error template: %s", err2), nil)
-	}
-}
-
-func logError(req *http.Request, err error, rv interface{}) {
-	if err != nil {
-		buf := bufpool.Get()
-		fmt.Fprintf(buf, "Error serving %s: %s", req.URL, err)
-		if rv != nil {
-			fmt.Fprintln(buf, rv)
-			buf.Write(debug.Stack())
-		}
-		log.Error(buf.String())
-		bufpool.Put(buf)
 	}
 }

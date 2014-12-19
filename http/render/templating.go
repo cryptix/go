@@ -6,11 +6,11 @@ package render
 import (
 	"errors"
 	"fmt"
-	"html"
 	htmpl "html/template"
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -76,16 +76,6 @@ func parseHTMLTemplates() error {
 		t.Funcs(htmpl.FuncMap{
 			"urlTo": urlTo,
 			"itoa":  strconv.Itoa,
-			"field": NewField,
-			"option": func(f *Field, val interface{}, label string) htmpl.HTML {
-				selected := ""
-				if f.Flash() == val || (f.Flash() == "" && f.Value() == val) {
-					selected = " selected"
-				}
-
-				return htmpl.HTML(fmt.Sprintf(`<option value="%s"%s>%s</option>`,
-					html.EscapeString(fmt.Sprintf("%v", val)), selected, html.EscapeString(label)))
-			},
 		})
 
 		err := parseFilesFromBindata(t, file)
@@ -132,6 +122,19 @@ func Render(w http.ResponseWriter, r *http.Request, name string, status int, dat
 func PlainError(w http.ResponseWriter, statusCode int, err error) {
 	log.Errorf("PlainError(%d):%s\n", statusCode, err)
 	http.Error(w, err.Error(), statusCode)
+}
+
+func logError(req *http.Request, err error, rv interface{}) {
+	if err != nil {
+		buf := bufpool.Get()
+		fmt.Fprintf(buf, "Error serving %s: %s", req.URL, err)
+		if rv != nil {
+			fmt.Fprintln(buf, rv)
+			buf.Write(debug.Stack())
+		}
+		log.Error(buf.String())
+		bufpool.Put(buf)
+	}
 }
 
 // copied from template.ParseFiles but dont use ioutil.ReadFile
