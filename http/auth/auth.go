@@ -25,7 +25,10 @@ const (
 	userTimeout
 )
 
-var ErrBadLogin = errors.New("Bad Login")
+var (
+	ErrBadLogin      = errors.New("Bad Login")
+	ErrNotAuthorized = errors.New("Not Authorized")
+)
 
 // Auther allows for custom authentication backends
 type Auther interface {
@@ -84,41 +87,44 @@ func (ah AuthHandler) Authorize(redir string) http.HandlerFunc {
 
 func (ah AuthHandler) Authenticate(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		session, err := ah.store.Get(r, sessionName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		if session.IsNew {
-			http.Error(w, "Not Authorized", http.StatusUnauthorized)
-			return
-		}
-
-		if _, ok := session.Values[userKey]; !ok {
-			http.Error(w, "Not Authorized", http.StatusUnauthorized)
-			return
-		}
-
-		t, ok := session.Values[userTimeout]
-		if !ok {
-			http.Error(w, "Not Authorized", http.StatusUnauthorized)
-			return
-		}
-
-		tout, ok := t.(time.Time)
-		if !ok {
-			http.Error(w, "Not Authorized", http.StatusUnauthorized)
-			return
-		}
-
-		if time.Now().After(tout) {
-			http.Error(w, "Not Authorized", http.StatusUnauthorized)
+		if err := ah.AuthenticateRequest(r); err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
 
 		h.ServeHTTP(w, r)
 	})
+}
+
+func (ah AuthHandler) AuthenticateRequest(r *http.Request) error {
+	session, err := ah.store.Get(r, sessionName)
+	if err != nil {
+		return err
+	}
+
+	if session.IsNew {
+		return ErrNotAuthorized
+	}
+
+	if _, ok := session.Values[userKey]; !ok {
+		return ErrNotAuthorized
+	}
+
+	t, ok := session.Values[userTimeout]
+	if !ok {
+		return ErrNotAuthorized
+	}
+
+	tout, ok := t.(time.Time)
+	if !ok {
+		return ErrNotAuthorized
+	}
+
+	if time.Now().After(tout) {
+		return ErrNotAuthorized
+	}
+
+	return nil
 }
 
 func (ah AuthHandler) Logout(redir string) http.HandlerFunc {
