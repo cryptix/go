@@ -20,7 +20,6 @@ var (
 func setup(t *testing.T) {
 	testMux = http.NewServeMux()
 	testClient = tester.New(testMux, t)
-
 	testStore = &sessions.CookieStore{
 		Codecs: securecookie.CodecsFromPairs(
 			securecookie.GenerateRandomKey(32), // new key every time we startup
@@ -33,6 +32,7 @@ func setup(t *testing.T) {
 	}
 	ah := NewHandler(&testAuthProvider, testStore)
 	testMux.Handle("/login", ah.Authorize("/todoRedir"))
+	testMux.Handle("/logout", ah.Logout("/logoutRedir"))
 	testMux.Handle("/profile", ah.Authenticate(http.HandlerFunc(restricted)))
 
 }

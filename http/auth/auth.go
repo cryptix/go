@@ -4,6 +4,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/sessions"
 )
@@ -14,12 +15,14 @@ type sessionKey uint
 func init() {
 	// need to register our Key with gob so gorilla/sessions can (de)serialize it
 	gob.Register(userKey)
+	gob.Register(time.Time{})
 }
 
 const (
 	sessionName = "AuthSession"
 
 	userKey sessionKey = iota
+	userTimeout
 )
 
 var ErrBadLogin = errors.New("Bad Login")
@@ -68,12 +71,13 @@ func (ah AuthHandler) Authorize(redir string) http.HandlerFunc {
 		}
 
 		session.Values[userKey] = id
+		session.Values[userTimeout] = time.Now().Add(5 * time.Minute)
 		if err := session.Save(r, w); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		http.Redirect(w, r, redir, http.StatusFound)
+		http.Redirect(w, r, redir, http.StatusTemporaryRedirect)
 		return
 	}
 }
@@ -86,11 +90,53 @@ func (ah AuthHandler) Authenticate(h http.Handler) http.Handler {
 			return
 		}
 
+		if session.IsNew {
+			http.Error(w, "Not Authorized", http.StatusUnauthorized)
+			return
+		}
+
 		if _, ok := session.Values[userKey]; !ok {
+			http.Error(w, "Not Authorized", http.StatusUnauthorized)
+			return
+		}
+
+		t, ok := session.Values[userTimeout]
+		if !ok {
+			http.Error(w, "Not Authorized", http.StatusUnauthorized)
+			return
+		}
+
+		tout, ok := t.(time.Time)
+		if !ok {
+			http.Error(w, "Not Authorized", http.StatusUnauthorized)
+			return
+		}
+
+		if time.Now().After(tout) {
 			http.Error(w, "Not Authorized", http.StatusUnauthorized)
 			return
 		}
 
 		h.ServeHTTP(w, r)
 	})
+}
+
+func (ah AuthHandler) Logout(redir string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		session, err := ah.store.Get(r, sessionName)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		session.Values[userTimeout] = time.Now().Add(-5 * time.Minute)
+		session.Options.MaxAge = -1
+		if err := session.Save(r, w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		http.Redirect(w, r, redir, http.StatusTemporaryRedirect)
+		return
+	}
 }
