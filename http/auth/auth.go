@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
 )
 
@@ -37,22 +36,9 @@ type AuthHandler struct {
 	store  sessions.Store
 }
 
-func NewHandler(a Auther) (ah AuthHandler) {
+func NewHandler(a Auther, store sessions.Store) (ah AuthHandler) {
 	ah.auther = a
-	// TODO: pass as argument as well
-	ah.store = &sessions.CookieStore{
-		Codecs: securecookie.CodecsFromPairs(
-			securecookie.GenerateRandomKey(32), // new key every time we startup
-			securecookie.GenerateRandomKey(32),
-		),
-		Options: &sessions.Options{
-			Path:   "/",
-			MaxAge: 86400 * 30,
-			// BUG(Henry): Add flag to toggle SSL-Only
-			// Secure:   true,
-			HttpOnly: true,
-		},
-	}
+	ah.store = store
 	return
 }
 
