@@ -26,7 +26,7 @@ var (
 	// Reload is whether to reload templates on each request.
 	Reload bool
 
-	log = logging.Logger("http")
+	log = logging.Logger("render")
 
 	// asset
 	asset assetFunc
