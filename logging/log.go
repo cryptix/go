@@ -15,6 +15,12 @@ func init() {
 	SetupLogging()
 }
 
+var closeChan chan<- os.Signal
+
+func SetCloseChan(c chan<- os.Signal) {
+	closeChan = c
+}
+
 // CheckFatal exits the process if err != nil
 func CheckFatal(err error) {
 	if err != nil {
@@ -31,9 +37,12 @@ func CheckFatal(err error) {
 			dotName := filepath.Ext(fn.Name())
 			fnName = strings.TrimLeft(dotName, ".") + "()"
 		}
-		log.Criticalf("%s:%d %s", file, line, fnName)
-		log.Critical("Fatal Error:", err.Error())
-
+		l.Criticalf("%s:%d %s", file, line, fnName)
+		l.Critical("Fatal Error:", err.Error())
+		if closeChan != nil {
+			l.Debug("Sending close message")
+			closeChan <- os.Interrupt
+		}
 		os.Exit(1)
 	}
 }
@@ -41,7 +50,7 @@ func CheckFatal(err error) {
 // ErrNoSuchLogger is returned when the util pkg is asked for a non existant logger
 var ErrNoSuchLogger = errors.New("Error: No such logger")
 
-var log = Logger("util")
+var l = Logger("logging")
 
 var ansiGray = "\033[0;37m"
 var ansiBlue = "\033[0;34m"
@@ -86,7 +95,7 @@ func SetupLogging() {
 		var err error
 		lvl, err = logpkg.LogLevel(logenv)
 		if err != nil {
-			log.Errorf("logpkg.LogLevel() Error: %q", err)
+			l.Errorf("logpkg.LogLevel() Error: %q", err)
 			lvl = logpkg.ERROR // reset to ERROR, could be undefined now(?)
 		}
 	}
