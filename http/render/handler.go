@@ -1,3 +1,11 @@
+/*
+Package render implements template inheritance and exposes functions to render HTML.
+
+inspired by http://elithrar.github.io/article/approximating-html-template-inheritance and https://github.com/sourcegraph/thesrc/blob/master/app/handler.go
+
+It also exports two types Binary and HMTL.
+Both wrap a http.HandlerFunc-like function with an error return value and argument the response.
+*/
 package render
 
 import (
@@ -5,6 +13,8 @@ import (
 	"net/http"
 )
 
+// Binary sets Content-Description and Content-Transfer-Encoding
+// if h returns an error it returns http status 500
 type Binary func(resp http.ResponseWriter, req *http.Request) error
 
 func (h Binary) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
@@ -16,21 +26,24 @@ func (h Binary) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// Html wrapps a htpp.HandlerFunc-like function with an error return value
-type Html func(resp http.ResponseWriter, req *http.Request) error
+// HTML expects render.Render to be called in it's wrapped handler.
+// if h returns an error, RenderError is called to render it.
+type HTML func(resp http.ResponseWriter, req *http.Request) error
 
-func (h Html) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+func (h HTML) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if Reload {
 		Load()
 	}
 
+	// resp.Header().Set("Content-Type","text/html")
 	if err := h(resp, req); err != nil {
 		logError(req, err, nil)
-		handleError(resp, req, http.StatusInternalServerError, err)
+		Error(resp, req, http.StatusInternalServerError, err)
 	}
 }
 
-func handleError(w http.ResponseWriter, r *http.Request, status int, err error) {
+// Error uses 'error.tmpl' to output an error in HTML format
+func Error(w http.ResponseWriter, r *http.Request, status int, err error) {
 	w.Header().Set("cache-control", "no-cache")
 	err2 := Render(w, r, "error.tmpl", status, map[string]interface{}{
 		"StatusCode": status,
@@ -39,5 +52,6 @@ func handleError(w http.ResponseWriter, r *http.Request, status int, err error) 
 	})
 	if err2 != nil {
 		logError(r, fmt.Errorf("during execution of error template: %s", err2), nil)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

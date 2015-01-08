@@ -1,6 +1,3 @@
-// Package templates implements template inheritance and exposes functions to render these
-//
-// inspired by http://elithrar.github.io/article/approximating-html-template-inheritance/
 package render
 
 import (
@@ -40,31 +37,35 @@ var (
 
 	// bufpool is shared between all render() calls
 	bufpool = bpool.NewBufferPool(64)
+
+	appRouter *mux.Router
 )
 
-func SetBaseTemplates(fn assetFunc, files []string) {
+// Init takes a go-bindata Asset function and base tempaltes, which are used to render other templates
+func Init(fn assetFunc, base []string) {
 	asset = fn
-	baseTemplateFiles = append(baseTemplateFiles, files...)
+	baseTemplateFiles = append(baseTemplateFiles, base...)
 }
 
+// AddTemplates adds filenames for the next call to parseTempaltes
 func AddTemplates(files []string) {
 	templateFiles = append(templateFiles, files...)
 }
 
-var appRouter *mux.Router
-
+// SetAppRouter is used to specify toe mux.Router, it's needed for the {{urlTo}} template func
 func SetAppRouter(r *mux.Router) {
 	appRouter = r
 }
 
-// Load loads and parses all templates that are in templateDir
+// Load loads and parses all templates that are in the assetFunc
 func Load() {
 	if appRouter == nil {
 		logging.CheckFatal(errors.New("No appRouter set"))
 	}
 
 	if len(baseTemplateFiles) == 0 {
-		baseTemplateFiles = []string{"navbar.tmpl", "base.tmpl"}
+		logging.CheckFatal(errors.New("No base tempaltes"))
+		// baseTemplateFiles = []string{"navbar.tmpl", "base.tmpl"}
 	}
 
 	logging.CheckFatal(parseHTMLTemplates())
