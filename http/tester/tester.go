@@ -24,10 +24,14 @@ func New(mux *http.ServeMux, t *testing.T) *Tester {
 	}
 }
 
-func (t *Tester) GetHTML(u string) (*goquery.Document, *httptest.ResponseRecorder) {
+func (t *Tester) GetHTML(u string, h *http.Header) (*goquery.Document, *httptest.ResponseRecorder) {
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		t.t.Fatal(err)
+	}
+
+	if h != nil {
+		req.Header = *h
 	}
 
 	rw := httptest.NewRecorder()
