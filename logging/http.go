@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/codegangsta/negroni"
-	logpkg "github.com/jbenet/go-logging"
+	logpkg "github.com/cryptix/go-logging"
 )
 
 type HTTPLogger struct {

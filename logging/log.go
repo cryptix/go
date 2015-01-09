@@ -2,18 +2,14 @@ package logging
 
 import (
 	"errors"
-	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 
-	logpkg "github.com/jbenet/go-logging"
+	logpkg "github.com/cryptix/go-logging"
 )
-
-func init() {
-	SetupLogging()
-}
 
 var closeChan chan<- os.Signal
 
@@ -72,44 +68,27 @@ const (
 // loggers is the set of loggers in the system
 var loggers = map[string]*logpkg.Logger{}
 
-// POut is a shorthand printing function to output to Stdout.
-func POut(format string, a ...interface{}) {
-	fmt.Fprintf(os.Stdout, format, a...)
-}
-
 // SetupLogging will initialize the logger backend and set the flags.
-func SetupLogging() {
+func SetupLogging(w io.Writer) {
 
 	fmt := LogFormats[os.Getenv(envLoggingFmt)]
 	if fmt == "" {
 		fmt = LogFormats[defaultLogFormat]
 	}
 
-	backend := logpkg.NewLogBackend(os.Stderr, "", 0)
-	logpkg.SetBackend(backend)
+	// only output warnings and above to stderr
+	var vis logpkg.Backend
+	vis = logpkg.NewLogBackend(os.Stderr, "", 0)
+	if w != nil {
+		fileBackend := logpkg.NewLogBackend(w, "", 0)
+		fileLog := logpkg.NewBackendFormatter(fileBackend, logpkg.MustStringFormatter(LogFormats["nocolor"]))
+		vis = logpkg.MultiLogger(vis, fileLog)
+	}
+	leveld := logpkg.AddModuleLevel(vis)
+	leveld.SetLevel(logpkg.NOTICE, "")
+
+	logpkg.SetBackend(leveld)
 	logpkg.SetFormatter(logpkg.MustStringFormatter(fmt))
-
-	lvl := logpkg.NOTICE
-
-	if logenv := os.Getenv(envLogging); logenv != "" {
-		var err error
-		lvl, err = logpkg.LogLevel(logenv)
-		if err != nil {
-			l.Errorf("logpkg.LogLevel() Error: %q", err)
-			lvl = logpkg.ERROR // reset to ERROR, could be undefined now(?)
-		}
-	}
-
-	SetAllLoggers(lvl)
-
-}
-
-// SetAllLoggers changes the logpkg.Level of all loggers to lvl
-func SetAllLoggers(lvl logpkg.Level) {
-	logpkg.SetLevel(lvl, "")
-	for i := range loggers {
-		logpkg.SetLevel(lvl, i)
-	}
 }
 
 // Logger retrieves a particular logger
@@ -117,30 +96,4 @@ func Logger(name string) *logpkg.Logger {
 	log := logpkg.MustGetLogger(name)
 	loggers[name] = log
 	return log
-}
-
-// SetLogLevel changes the log level of a specific subsystem
-// name=="*" changes all subsystems
-func SetLogLevel(name, level string) error {
-	lvl, err := logpkg.LogLevel(level)
-	if err != nil {
-		return err
-	}
-
-	// wildcard, change all
-	if name == "*" {
-		SetAllLoggers(lvl)
-		return nil
-	}
-
-	// Check if we have a logger by that name
-	// logpkg.SetLevel() can't tell us...
-	_, ok := loggers[name]
-	if !ok {
-		return ErrNoSuchLogger
-	}
-
-	logpkg.SetLevel(lvl, name)
-
-	return nil
 }
