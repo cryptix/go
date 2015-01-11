@@ -1,6 +1,6 @@
 package msgbox
 
-import "github.com/andlabs/ui"
+import "DST/Godeps/_workspace/src/github.com/andlabs/ui"
 
 // New creates a new Window and hides the parent window until the "Ok" button is pressed
 // once clicked, the done channel is closed so that the calling function can continue
@@ -10,10 +10,12 @@ func New(p ui.Window, titel, msg string) {
 	done := make(chan struct{})
 	go ui.Do(func() {
 		p.Hide()
-		msgLabel := ui.NewLabel(msg)
+		msgField := ui.NewTextField()
+		msgField.SetReadOnly(true)
+		msgField.SetText(msg)
 		btn := ui.NewButton("Ok")
 		stack := ui.NewVerticalStack(
-			msgLabel,
+			msgField,
 			btn,
 		)
 		stack.SetStretchy(0)
