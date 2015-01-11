@@ -1,7 +1,6 @@
 package logging
 
 import (
-	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -43,30 +42,29 @@ func CheckFatal(err error) {
 	}
 }
 
-// ErrNoSuchLogger is returned when the util pkg is asked for a non existant logger
-var ErrNoSuchLogger = errors.New("Error: No such logger")
+var (
+	l = Logger("logging")
 
-var l = Logger("logging")
-
-var ansiGray = "\033[0;37m"
-var ansiBlue = "\033[0;34m"
+	// loggers is the set of loggers in the system
+	loggers = map[string]*logpkg.Logger{}
+)
 
 // LogFormats is a map of formats used for our logger, keyed by name.
 var LogFormats = map[string]string{
 	"nocolor": "%{time:2006-01-02 15:04:05.000000} %{level} %{module} %{shortfile}: %{message}",
-	"color": ansiGray + "%{time:15:04:05.000} %{color}%{level:5.5s} " + ansiBlue +
-		"%{module:10.10s}: %{color:reset}%{message} " + ansiGray + "%{shortfile}%{color:reset}",
+	"color":   ansiGray + "%{time:15:04:05.000} %{color}%{level:5.5s} " + ansiBlue + "%{module:10.10s}: %{color:reset}%{message} " + ansiGray + "%{shortfile}%{color:reset}",
 }
-var defaultLogFormat = "color"
 
-// Logging environment variables
 const (
-	envLogging    = "CRYPTIX_LOGGING"
+	// Logging environment variables
 	envLoggingFmt = "CRYPTIX_LOGGING_FMT"
-)
 
-// loggers is the set of loggers in the system
-var loggers = map[string]*logpkg.Logger{}
+	// ansi colorcode constants
+	ansiGray = "\033[0;37m"
+	ansiBlue = "\033[0;34m"
+
+	defaultLogFormat = "color"
+)
 
 // SetupLogging will initialize the logger backend and set the flags.
 func SetupLogging(w io.Writer) {
