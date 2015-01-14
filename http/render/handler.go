@@ -42,6 +42,21 @@ func (h HTML) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// StaticHTML just renders a template without any extra data
+type StaticHTML string
+
+func (tpl StaticHTML) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	if Reload {
+		Load()
+	}
+
+	err := Render(resp, req, string(tpl), http.StatusOK, nil)
+	if err != nil {
+		logError(req, err, nil)
+		Error(resp, req, http.StatusInternalServerError, err)
+	}
+}
+
 // Error uses 'error.tmpl' to output an error in HTML format
 func Error(w http.ResponseWriter, r *http.Request, status int, err error) {
 	w.Header().Set("cache-control", "no-cache")
