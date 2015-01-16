@@ -37,18 +37,19 @@ type Auther interface {
 	Check(user, pass string) (interface{}, error)
 }
 
-type AuthHandler struct {
+type Handler struct {
 	auther Auther
 	store  sessions.Store
 }
 
-func NewHandler(a Auther, store sessions.Store) (ah AuthHandler) {
+func NewHandler(a Auther, store sessions.Store) *Handler {
+	var ah Handler
 	ah.auther = a
 	ah.store = store
-	return
+	return &ah
 }
 
-func (ah AuthHandler) Authorize(redir string) http.HandlerFunc {
+func (ah Handler) Authorize(redir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session, err := ah.store.Get(r, sessionName)
 		if err != nil {
@@ -85,7 +86,7 @@ func (ah AuthHandler) Authorize(redir string) http.HandlerFunc {
 	}
 }
 
-func (ah AuthHandler) Authenticate(h http.Handler) http.Handler {
+func (ah Handler) Authenticate(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := ah.AuthenticateRequest(r); err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
@@ -96,7 +97,7 @@ func (ah AuthHandler) Authenticate(h http.Handler) http.Handler {
 	})
 }
 
-func (ah AuthHandler) AuthenticateRequest(r *http.Request) error {
+func (ah Handler) AuthenticateRequest(r *http.Request) error {
 	session, err := ah.store.Get(r, sessionName)
 	if err != nil {
 		return err
@@ -127,7 +128,7 @@ func (ah AuthHandler) AuthenticateRequest(r *http.Request) error {
 	return nil
 }
 
-func (ah AuthHandler) Logout(redir string) http.HandlerFunc {
+func (ah Handler) Logout(redir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session, err := ah.store.Get(r, sessionName)
 		if err != nil {
