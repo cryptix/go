@@ -88,7 +88,7 @@ func (ah Handler) Authorize(redir string) http.HandlerFunc {
 
 func (ah Handler) Authenticate(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := ah.AuthenticateRequest(r); err != nil {
+		if _, err := ah.AuthenticateRequest(r); err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
@@ -97,35 +97,36 @@ func (ah Handler) Authenticate(h http.Handler) http.Handler {
 	})
 }
 
-func (ah Handler) AuthenticateRequest(r *http.Request) error {
+func (ah Handler) AuthenticateRequest(r *http.Request) (interface{}, error) {
 	session, err := ah.store.Get(r, sessionName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if session.IsNew {
-		return ErrNotAuthorized
+		return nil, ErrNotAuthorized
 	}
 
-	if _, ok := session.Values[userKey]; !ok {
-		return ErrNotAuthorized
+	user, ok := session.Values[userKey]
+	if !ok {
+		return nil, ErrNotAuthorized
 	}
 
 	t, ok := session.Values[userTimeout]
 	if !ok {
-		return ErrNotAuthorized
+		return nil, ErrNotAuthorized
 	}
 
 	tout, ok := t.(time.Time)
 	if !ok {
-		return ErrNotAuthorized
+		return nil, ErrNotAuthorized
 	}
 
 	if time.Now().After(tout) {
-		return ErrNotAuthorized
+		return nil, ErrNotAuthorized
 	}
 
-	return nil
+	return user, nil
 }
 
 func (ah Handler) Logout(redir string) http.HandlerFunc {
