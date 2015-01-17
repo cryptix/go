@@ -30,9 +30,14 @@ func setup(t *testing.T) {
 			MaxAge: 30,
 		},
 	}
-	ah := NewHandler(&testAuthProvider, testStore)
-	testMux.Handle("/login", ah.Authorize("/todoRedir"))
-	testMux.Handle("/logout", ah.Logout("/logoutRedir"))
+	ah, err := NewHandler(&testAuthProvider,
+		SetStore(testStore),
+		SetLanding("/landingRedir"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	testMux.HandleFunc("/login", ah.Authorize)
+	testMux.HandleFunc("/logout", ah.Logout)
 	testMux.Handle("/profile", ah.Authenticate(http.HandlerFunc(restricted)))
 
 }

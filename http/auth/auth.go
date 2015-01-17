@@ -40,50 +40,72 @@ type Auther interface {
 type Handler struct {
 	auther Auther
 	store  sessions.Store
+
+	// the url to redirect to after login/logout
+	landing string
+
+	// how long should a session life
+	lifetime time.Duration
 }
 
-func NewHandler(a Auther, store sessions.Store) *Handler {
+func NewHandler(a Auther, options ...func(*Handler) error) (*Handler, error) {
 	var ah Handler
 	ah.auther = a
-	ah.store = store
-	return &ah
+
+	for _, o := range options {
+		if err := o(&ah); err != nil {
+			return nil, err
+		}
+	}
+
+	if ah.store == nil {
+		return nil, errors.New("please set a session.Store")
+	}
+
+	// defaults
+	if ah.lifetime == 0 {
+		ah.lifetime = 5 * time.Minute
+	}
+
+	if ah.landing == "" {
+		ah.landing = "/"
+	}
+	return &ah, nil
 }
 
-func (ah Handler) Authorize(redir string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		session, err := ah.store.Get(r, sessionName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if err := r.ParseForm(); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		user := r.Form.Get("user")
-		pass := r.Form.Get("pass")
-		if user == "" || pass == "" {
-			http.Error(w, ErrBadLogin.Error(), http.StatusBadRequest)
-			return
-		}
-
-		id, err := ah.auther.Check(user, pass)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		session.Values[userKey] = id
-		session.Values[userTimeout] = time.Now().Add(5 * time.Minute)
-		if err := session.Save(r, w); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		http.Redirect(w, r, redir, http.StatusTemporaryRedirect)
+func (ah Handler) Authorize(w http.ResponseWriter, r *http.Request) {
+	session, err := ah.store.Get(r, sessionName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	user := r.Form.Get("user")
+	pass := r.Form.Get("pass")
+	if user == "" || pass == "" {
+		http.Error(w, ErrBadLogin.Error(), http.StatusBadRequest)
+		return
+	}
+
+	id, err := ah.auther.Check(user, pass)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	session.Values[userKey] = id
+	session.Values[userTimeout] = time.Now().Add(ah.lifetime)
+	if err := session.Save(r, w); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, ah.landing, http.StatusTemporaryRedirect)
+	return
 }
 
 func (ah Handler) Authenticate(h http.Handler) http.Handler {
@@ -129,22 +151,20 @@ func (ah Handler) AuthenticateRequest(r *http.Request) (interface{}, error) {
 	return user, nil
 }
 
-func (ah Handler) Logout(redir string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		session, err := ah.store.Get(r, sessionName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		session.Values[userTimeout] = time.Now().Add(-5 * time.Minute)
-		session.Options.MaxAge = -1
-		if err := session.Save(r, w); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		http.Redirect(w, r, redir, http.StatusTemporaryRedirect)
+func (ah Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	session, err := ah.store.Get(r, sessionName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	session.Values[userTimeout] = time.Now().Add(-ah.lifetime)
+	session.Options.MaxAge = -1
+	if err := session.Save(r, w); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, ah.landing, http.StatusTemporaryRedirect)
+	return
 }
