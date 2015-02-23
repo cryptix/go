@@ -19,12 +19,13 @@ func init() {
 }
 
 const (
-	sessionName = "AuthSession"
+	defaultSessionName = "AuthSession"
 
 	userKey sessionKey = iota
 	userTimeout
 )
 
+// errors to be checked against returned
 var (
 	ErrBadLogin      = errors.New("Bad Login")
 	ErrNotAuthorized = errors.New("Not Authorized")
@@ -46,6 +47,9 @@ type Handler struct {
 
 	// how long should a session life
 	lifetime time.Duration
+
+	// the name of the cookie
+	sessionName string
 }
 
 func NewHandler(a Auther, options ...func(*Handler) error) (*Handler, error) {
@@ -70,11 +74,16 @@ func NewHandler(a Auther, options ...func(*Handler) error) (*Handler, error) {
 	if ah.landing == "" {
 		ah.landing = "/"
 	}
+
+	if ah.sessionName == "" {
+		ah.sessionName = defaultSessionName
+	}
+
 	return &ah, nil
 }
 
 func (ah Handler) Authorize(w http.ResponseWriter, r *http.Request) {
-	session, err := ah.store.Get(r, sessionName)
+	session, err := ah.store.Get(r, ah.sessionName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -120,7 +129,7 @@ func (ah Handler) Authenticate(h http.Handler) http.Handler {
 }
 
 func (ah Handler) AuthenticateRequest(r *http.Request) (interface{}, error) {
-	session, err := ah.store.Get(r, sessionName)
+	session, err := ah.store.Get(r, ah.sessionName)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +161,7 @@ func (ah Handler) AuthenticateRequest(r *http.Request) (interface{}, error) {
 }
 
 func (ah Handler) Logout(w http.ResponseWriter, r *http.Request) {
-	session, err := ah.store.Get(r, sessionName)
+	session, err := ah.store.Get(r, ah.sessionName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -70,7 +70,7 @@ func TestLogin_workingLogin(t *testing.T) {
 	a.Equal("/landingRedir", resp.Header().Get("Location"))
 	a.True(called)
 	newCookie := resp.Header().Get("Set-Cookie")
-	a.Contains(newCookie, sessionName)
+	a.Contains(newCookie, defaultSessionName)
 }
 
 func TestLogin_workingLoginAndRestrictedAcc(t *testing.T) {
@@ -94,7 +94,7 @@ func TestLogin_workingLoginAndRestrictedAcc(t *testing.T) {
 	a.Equal(http.StatusTemporaryRedirect, resp.Code)
 	a.True(called)
 	newCookie := resp.Header().Get("Set-Cookie")
-	a.Contains(newCookie, sessionName)
+	a.Contains(newCookie, defaultSessionName)
 
 	resp2 := testClient.GetBody("/profile", &http.Header{"Cookie": []string{newCookie}})
 	a.Equal(http.StatusOK, resp2.Code)
@@ -121,7 +121,7 @@ func TestLogin_workingLoginAndLogout(t *testing.T) {
 	a.Equal(http.StatusTemporaryRedirect, resp.Code)
 	a.True(called)
 	newCookie := resp.Header().Get("Set-Cookie")
-	a.Contains(newCookie, sessionName)
+	a.Contains(newCookie, defaultSessionName)
 
 	resp2 := testClient.GetBody("/logout", &http.Header{"Cookie": []string{newCookie}})
 	logoutCookie := resp2.Header().Get("Set-Cookie")
