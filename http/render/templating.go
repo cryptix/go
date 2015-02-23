@@ -12,9 +12,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/cryptix/go/logging"
 	"github.com/gorilla/mux"
 	"github.com/oxtoacart/bpool"
+	"gopkg.in/errgo.v1"
 )
 
 type assetFunc func(name string) ([]byte, error)
@@ -60,11 +62,11 @@ func SetAppRouter(r *mux.Router) {
 // Load loads and parses all templates that are in the assetFunc
 func Load() {
 	if appRouter == nil {
-		logging.CheckFatal(errors.New("No appRouter set"))
+		logging.CheckFatal(errgo.New("No appRouter set"))
 	}
 
 	if len(baseTemplateFiles) == 0 {
-		logging.CheckFatal(errors.New("No base tempaltes"))
+		logging.CheckFatal(errgo.New("No base tempaltes"))
 		// baseTemplateFiles = []string{"navbar.tmpl", "base.tmpl"}
 	}
 
@@ -81,12 +83,12 @@ func parseHTMLTemplates() error {
 
 		err := parseFilesFromBindata(t, file)
 		if err != nil {
-			return fmt.Errorf("template %v: %s", file, err)
+			return errgo.Notef(err, "template %s", file)
 		}
 
 		t = t.Lookup("base")
 		if t == nil {
-			return fmt.Errorf("base template not found in %v", file)
+			return errgo.Newf("base template not found in %v", file)
 		}
 		templates[strings.TrimPrefix(file, "tmpl/")] = t
 	}
@@ -115,13 +117,20 @@ func Render(w http.ResponseWriter, r *http.Request, name string, status int, dat
 	w.WriteHeader(status)
 	_, err = buf.WriteTo(w)
 	bufpool.Put(buf)
-	log.Infof("Rendered %q Status:%d (took %v)", name, status, time.Since(start))
+	log.WithFields(logrus.Fields{
+		"name":   name,
+		"status": status,
+		"took":   time.Since(start),
+	}).Info("Rendered")
 	return err
 }
 
 // PlainError helps rendering user errors
 func PlainError(w http.ResponseWriter, statusCode int, err error) {
-	log.Errorf("PlainError(%d):%s\n", statusCode, err)
+	log.WithFields(logrus.Fields{
+		"status": statusCode,
+		"err":    errgo.Details(err),
+	}).Error("PlainError")
 	http.Error(w, err.Error(), statusCode)
 }
 
@@ -145,16 +154,17 @@ func parseFilesFromBindata(t *htmpl.Template, file string) error {
 	files := make([]string, len(baseTemplateFiles)+1)
 	files[0] = file
 	copy(files[1:], baseTemplateFiles)
-	log.Debugf("parseFile - %q", files)
 
 	for _, filename := range files {
 		var tmplBytes []byte
 		tmplBytes, err = asset(filename)
 		if err != nil {
-			log.Noticef("parseFile - Error from Asset() - %v", err)
-			return err
+			log.WithFields(logrus.Fields{
+				"fname": filename,
+				"err":   err,
+			}).Errorf("Error from Asset()")
+			return errgo.Notef(err, "Asset() failed")
 		}
-
 		var name = filepath.Base(filename)
 		// First template becomes return value if not already defined,
 		// and we use that one for subsequent New calls to associate
@@ -182,7 +192,10 @@ func parseFilesFromBindata(t *htmpl.Template, file string) error {
 func urlTo(routeName string, ps ...interface{}) *url.URL {
 	route := appRouter.Get(routeName)
 	if route == nil {
-		log.Warningf("no such route: %q (params: %v)", routeName, ps)
+		log.WithFields(logrus.Fields{
+			"route":  routeName,
+			"params": ps,
+		}).Warning("no such route")
 		return &url.URL{}
 	}
 
@@ -204,7 +217,12 @@ func urlTo(routeName string, ps ...interface{}) *url.URL {
 
 	u, err := route.URLPath(params...)
 	if err != nil {
-		log.Errorf("Route error: failed to make URL for route %q (params: %v): %s", routeName, params, err)
+		log.WithFields(logrus.Fields{
+			"route":  routeName,
+			"params": params,
+			"error":  err,
+		}).Warning("no such route")
+		log.Error("Route error: failed to make URL")
 		return &url.URL{}
 	}
 	return u

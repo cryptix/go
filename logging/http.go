@@ -4,24 +4,31 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/codegangsta/negroni"
-	logpkg "github.com/cryptix/go-logging"
 )
 
 type HTTPLogger struct {
-	*logpkg.Logger
+	*logrus.Logger
 }
 
-func NewNegroni(name string) *HTTPLogger {
-	return &HTTPLogger{Logger(name)}
+func NewNegroni(l *logrus.Logger) *HTTPLogger {
+	return &HTTPLogger{l}
 }
 
 func (l *HTTPLogger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	start := time.Now()
-	l.Infof("Started %s %s", r.Method, r.URL.Path)
+
+	l.WithFields(logrus.Fields{
+		"method": r.Method,
+		"path":   r.URL.Path,
+	}).Info("Request started")
 
 	next(rw, r)
 
 	res := rw.(negroni.ResponseWriter)
-	l.Infof("Completed %v %s in %v", res.Status(), http.StatusText(res.Status()), time.Since(start))
+	l.WithFields(logrus.Fields{
+		"status": res.Status(),
+		"took":   time.Since(start),
+	}).Info("Request completed")
 }
