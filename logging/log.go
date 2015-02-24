@@ -54,6 +54,8 @@ func SetupLogging(w io.Writer) {
 }
 
 func Logger(name string) *logrus.Logger {
-	l.WithField("name", name).Warn("depricated name parameter")
+	if len(name) > 0 {
+		l.WithField("name", name).Warn("depricated name parameter")
+	}
 	return l
 }
