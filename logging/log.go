@@ -47,15 +47,17 @@ var l = logrus.New()
 
 // SetupLogging will initialize the logger backend and set the flags.
 func SetupLogging(w io.Writer) {
-
 	if w != nil {
 		l.Out = io.MultiWriter(os.Stderr, w)
 	}
 }
 
-func Logger(name string) *logrus.Logger {
-	if len(name) > 0 {
-		l.WithField("name", name).Warn("depricated name parameter")
+// Logger returns a logger where the module field is set to name
+// https://github.com/Sirupsen/logrus/issues/144
+func Logger(name string) *logrus.Entry {
+	if len(name) == 0 {
+		l.Warnf("missing name parameter")
+		name = "undefined"
 	}
-	return l
+	return l.WithField("module", name)
 }
