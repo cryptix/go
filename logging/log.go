@@ -33,22 +33,30 @@ func CheckFatal(err error) {
 			dotName := filepath.Ext(fn.Name())
 			fnName = strings.TrimLeft(dotName, ".") + "()"
 		}
-		l.Errorf("%s:%d %s", file, line, fnName)
-		l.Error("Fatal Error:", errgo.Details(err))
+		logrus.Errorf("%s:%d %s", file, line, fnName)
+		logrus.Error("Fatal Error:", errgo.Details(err))
 		if closeChan != nil {
-			l.Warn("Sending close message")
+			logrus.Warn("Sending close message")
 			closeChan <- os.Interrupt
 		}
 		os.Exit(1)
 	}
 }
 
-var l = logrus.New()
-
 // SetupLogging will initialize the logger backend and set the flags.
 func SetupLogging(w io.Writer) {
 	if w != nil {
-		l.Out = io.MultiWriter(os.Stderr, w)
+		logrus.SetOutput(io.MultiWriter(os.Stderr, w))
+	}
+	if runtime.GOOS == "windows" { // colored ttys are rare on windows...
+		logrus.SetFormatter(&logrus.TextFormatter{DisableColors: true})
+	}
+	if lvl := os.Getenv("CRYPTIX_LOGLVL"); lvl != "" {
+		l, err := logrus.ParseLevel(lvl)
+		if err != nil {
+			l = logrus.DebugLevel
+		}
+		logrus.SetLevel(l)
 	}
 }
 
@@ -56,8 +64,8 @@ func SetupLogging(w io.Writer) {
 // https://github.com/Sirupsen/logrus/issues/144
 func Logger(name string) *logrus.Entry {
 	if len(name) == 0 {
-		l.Warnf("missing name parameter")
+		logrus.Warnf("missing name parameter")
 		name = "undefined"
 	}
-	return l.WithField("module", name)
+	return logrus.WithField("module", name)
 }

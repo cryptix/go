@@ -26,7 +26,7 @@ func (l *HTTPLogger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next htt
 	l.WithFields(logrus.Fields{
 		"method": r.Method,
 		"path":   r.URL.Path,
-	}).Info("Request started")
+	}).Debug("Request started")
 
 	next(rw, r)
 
@@ -34,5 +34,5 @@ func (l *HTTPLogger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next htt
 	l.WithFields(logrus.Fields{
 		"status": res.Status(),
 		"took":   time.Since(start),
-	}).Info("Request completed")
+	}).Debug("Request completed")
 }

@@ -121,7 +121,7 @@ func Render(w http.ResponseWriter, r *http.Request, name string, status int, dat
 		"name":   name,
 		"status": status,
 		"took":   time.Since(start),
-	}).Info("Rendered")
+	}).Debug("Rendered")
 	return err
 }
 
