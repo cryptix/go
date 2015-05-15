@@ -1,6 +1,6 @@
 package msgbox
 
-import "DST/Godeps/_workspace/src/github.com/andlabs/ui"
+import "github.com/andlabs/ui"
 
 // New creates a new Window and hides the parent window until the "Ok" button is pressed
 // once clicked, the done channel is closed so that the calling function can continue
