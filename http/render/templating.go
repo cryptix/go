@@ -6,20 +6,17 @@ import (
 	htmpl "html/template"
 	"net/http"
 	"net/url"
-	"path/filepath"
 	"runtime/debug"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/cryptix/go/logging"
 	"github.com/gorilla/mux"
 	"github.com/oxtoacart/bpool"
+	"github.com/shurcooL/go/vfs/httpfs/html/vfstemplate"
 	"gopkg.in/errgo.v1"
 )
-
-type assetFunc func(name string) ([]byte, error)
 
 var (
 	// Reload is whether to reload templates on each request.
@@ -27,8 +24,7 @@ var (
 
 	log = logging.Logger("render")
 
-	// asset
-	asset assetFunc
+	assets http.FileSystem
 
 	// files
 	templateFiles     []string
@@ -44,8 +40,8 @@ var (
 )
 
 // Init takes a go-bindata Asset function and base tempaltes, which are used to render other templates
-func Init(fn assetFunc, base []string) {
-	asset = fn
+func Init(fs http.FileSystem, base []string) {
+	assets = fs
 	baseTemplateFiles = append(baseTemplateFiles, base...)
 }
 
@@ -75,13 +71,12 @@ func Load() {
 
 func parseHTMLTemplates() error {
 	for _, file := range templateFiles {
-		t := htmpl.New("")
-		t.Funcs(htmpl.FuncMap{
+		t := htmpl.New("").Funcs(htmpl.FuncMap{
 			"urlTo": urlTo,
 			"itoa":  strconv.Itoa,
 		})
-
-		err := parseFilesFromBindata(t, file)
+		var err error
+		t, err = vfstemplate.ParseFiles(assets, t, append(baseTemplateFiles, file)...)
 		if err != nil {
 			return errgo.Notef(err, "template %s", file)
 		}
@@ -90,7 +85,7 @@ func parseHTMLTemplates() error {
 		if t == nil {
 			return errgo.Newf("base template not found in %v", file)
 		}
-		templates[strings.TrimPrefix(file, "tmpl/")] = t
+		templates[file] = t
 	}
 	return nil
 }
@@ -145,48 +140,6 @@ func logError(req *http.Request, err error, rv interface{}) {
 		log.Error(buf.String())
 		bufpool.Put(buf)
 	}
-}
-
-// copied from template.ParseFiles but dont use ioutil.ReadFile
-func parseFilesFromBindata(t *htmpl.Template, file string) error {
-	var err error
-
-	files := make([]string, len(baseTemplateFiles)+1)
-	files[0] = file
-	copy(files[1:], baseTemplateFiles)
-
-	for _, filename := range files {
-		var tmplBytes []byte
-		tmplBytes, err = asset(filename)
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"fname": filename,
-				"err":   err,
-			}).Errorf("Error from Asset()")
-			return errgo.Notef(err, "Asset() failed")
-		}
-		var name = filepath.Base(filename)
-		// First template becomes return value if not already defined,
-		// and we use that one for subsequent New calls to associate
-		// all the templates together. Also, if this file has the same name
-		// as t, this file becomes the contents of t, so
-		//  t, err := New(name).Funcs(xxx).ParseFiles(name)
-		// works. Otherwise we create a new template associated with t.
-		var tmpl *htmpl.Template
-		if t == nil {
-			t = htmpl.New(name)
-		}
-		if name == t.Name() {
-			tmpl = t
-		} else {
-			tmpl = t.New(name)
-		}
-		_, err = tmpl.Parse(string(tmplBytes))
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func urlTo(routeName string, ps ...interface{}) *url.URL {

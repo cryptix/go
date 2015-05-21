@@ -60,7 +60,7 @@ func (tpl StaticHTML) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 // Error uses 'error.tmpl' to output an error in HTML format
 func Error(w http.ResponseWriter, r *http.Request, status int, err error) {
 	w.Header().Set("cache-control", "no-cache")
-	err2 := Render(w, r, "error.tmpl", status, map[string]interface{}{
+	err2 := Render(w, r, "/error.tmpl", status, map[string]interface{}{
 		"StatusCode": status,
 		"Status":     http.StatusText(status),
 		"Err":        err,
