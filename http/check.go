@@ -4,21 +4,17 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+
+	"gopkg.in/errgo.v1"
 )
 
 // An ErrorResponse reports errors caused by an API request.
 type ErrorResponse struct {
-	Response   *http.Response `json:",omitempty"`
-	Body       []byte
-	ReadAllErr error
+	Response *http.Response `json:",omitempty"`
+	Body     []byte
 }
 
 func (r *ErrorResponse) Error() string {
-	if r.ReadAllErr != nil {
-		return fmt.Sprintf("%v %v: %d\nCould not read Body: %s",
-			r.Response.Request.Method, r.Response.Request.URL,
-			r.Response.StatusCode, r.ReadAllErr)
-	}
 	return fmt.Sprintf("%v %v: %d\n%v",
 		r.Response.Request.Method, r.Response.Request.URL,
 		r.Response.StatusCode, string(r.Body))
@@ -37,7 +33,7 @@ func CheckResponse(r *http.Response) error {
 	var err error
 	errorResponse.Body, err = ioutil.ReadAll(r.Body)
 	if err != nil {
-		errorResponse.ReadAllErr = err
+		return errgo.Notef(err, "cryptix/http: ReadAll(resp.Body) failed. URL: %s", r.Request.URL.String())
 	}
 
 	return errorResponse
