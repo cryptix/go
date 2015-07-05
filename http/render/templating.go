@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"runtime/debug"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -85,7 +86,8 @@ func parseHTMLTemplates() error {
 		if t == nil {
 			return errgo.Newf("base template not found in %v", file)
 		}
-		templates[file] = t
+		// TODO(cryptix): refactor all of this.. maybe templateName > path?
+		templates[strings.TrimPrefix(file, "/tmpl")] = t
 	}
 	return nil
 }
