@@ -43,7 +43,7 @@ func CheckFatal(err error) {
 	}
 }
 
-var Underlying *logrus.Logger
+var Underlying = logrus.New()
 
 // SetupLogging will initialize the logger backend and set the flags.
 func SetupLogging(w io.Writer) {
@@ -61,7 +61,6 @@ func SetupLogging(w io.Writer) {
 		}
 		logrus.SetLevel(l)
 	}
-	Underlying = logrus.New()
 }
 
 // Logger returns an Entry where the module field is set to name
