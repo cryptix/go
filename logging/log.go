@@ -43,6 +43,8 @@ func CheckFatal(err error) {
 	}
 }
 
+var Underlying *logrus.Logger
+
 // SetupLogging will initialize the logger backend and set the flags.
 func SetupLogging(w io.Writer) {
 	if w != nil {
@@ -54,18 +56,19 @@ func SetupLogging(w io.Writer) {
 	if lvl := os.Getenv("CRYPTIX_LOGLVL"); lvl != "" {
 		l, err := logrus.ParseLevel(lvl)
 		if err != nil {
+			logrus.Errorf("logging: could not parse lvl from env, defaulting to debug: %s", err)
 			l = logrus.DebugLevel
 		}
 		logrus.SetLevel(l)
 	}
+	Underlying = logrus.New()
 }
 
-// Logger returns a logger where the module field is set to name
-// https://github.com/Sirupsen/logrus/issues/144
+// Logger returns an Entry where the module field is set to name
 func Logger(name string) *logrus.Entry {
-	if len(name) == 0 {
-		logrus.Warnf("missing name parameter")
+	if name == "" {
+		Underlying.Warnf("missing name parameter")
 		name = "undefined"
 	}
-	return logrus.WithField("module", name)
+	return Underlying.WithField("module", name)
 }
