@@ -15,7 +15,7 @@ import (
 	"github.com/cryptix/go/logging"
 	"github.com/gorilla/mux"
 	"github.com/oxtoacart/bpool"
-	"github.com/shurcooL/go/vfs/httpfs/html/vfstemplate"
+	"github.com/shurcooL/httpfs/html/vfstemplate"
 	"gopkg.in/errgo.v1"
 )
 
