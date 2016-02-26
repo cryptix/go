@@ -1,6 +1,7 @@
 package debug
 
 import (
+	"encoding/hex"
 	"io"
 	"log"
 
@@ -53,6 +54,28 @@ func (l *readLogger) Read(p []byte) (n int, err error) {
 // printing the prefix and the hexadecimal data written.
 func NewReadLogger(prefix string, r io.Reader) io.Reader {
 	return &readLogger{prefix, r}
+}
+
+type readHexLogger struct {
+	prefix string
+	r      io.Reader
+}
+
+func (l *readHexLogger) Read(p []byte) (n int, err error) {
+	n, err = l.r.Read(p)
+	if err != nil {
+		log.Printf("%s (%d bytes) Error: %v", l.prefix, n, err)
+	} else {
+		log.Printf("%s (%d bytes)", l.prefix, n)
+	}
+	log.Print("\n" + hex.Dump(p[:n]))
+	return
+}
+
+// NewReadHexLogger returns a reader that behaves like r except
+// that it logs to stderr using ecoding/hex.
+func NewReadHexLogger(prefix string, r io.Reader) io.Reader {
+	return &readHexLogger{prefix, r}
 }
 
 // logrus version
