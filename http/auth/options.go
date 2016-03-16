@@ -32,13 +32,25 @@ func SetSessionName(name string) Option {
 	}
 }
 
-// SetLanding sets the url to where a client is redirect
+// SetLanding sets the url to where a client is redirect to after login
 func SetLanding(l string) Option {
 	return func(h *Handler) error {
 		if l == "" {
 			return errors.New("landing redirect can't be empty")
 		}
-		h.landing = l
+		h.redirLanding = l
+		return nil
+	}
+}
+
+// SetLogout sets the url to where a client is redirect to after logout
+// uses Landing location by default
+func SetLogout(l string) Option {
+	return func(h *Handler) error {
+		if l == "" {
+			return errors.New("logout redirect can't be empty")
+		}
+		h.redirLogout = l
 		return nil
 	}
 }

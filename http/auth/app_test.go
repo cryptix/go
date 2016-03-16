@@ -15,6 +15,7 @@ var (
 	testClient       *tester.Tester
 	testAuthProvider mockProvider
 	testStore        sessions.Store
+	testOptions      []Option
 )
 
 func setup(t *testing.T) {
@@ -30,9 +31,9 @@ func setup(t *testing.T) {
 			MaxAge: 30,
 		},
 	}
-	ah, err := NewHandler(&testAuthProvider,
-		SetStore(testStore),
-		SetLanding("/landingRedir"))
+
+	var opts = append([]Option{SetStore(testStore), SetLanding("/landingRedir")}, testOptions...)
+	ah, err := NewHandler(&testAuthProvider, opts...)
 	if err != nil {
 		t.Fatal(err)
 	}

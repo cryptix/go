@@ -66,7 +66,7 @@ func TestLogin_workingLogin(t *testing.T) {
 		return 23, nil
 	}
 	resp := testClient.PostForm("/login", vals)
-	a.Equal(http.StatusTemporaryRedirect, resp.Code)
+	a.Equal(http.StatusSeeOther, resp.Code)
 	a.Equal("/landingRedir", resp.Header().Get("Location"))
 	a.True(called)
 	newCookie := resp.Header().Get("Set-Cookie")
@@ -91,7 +91,7 @@ func TestLogin_workingLoginAndRestrictedAcc(t *testing.T) {
 		return 23, nil
 	}
 	resp := testClient.PostForm("/login", vals)
-	a.Equal(http.StatusTemporaryRedirect, resp.Code)
+	a.Equal(http.StatusSeeOther, resp.Code)
 	a.True(called)
 	newCookie := resp.Header().Get("Set-Cookie")
 	a.Contains(newCookie, defaultSessionName)
@@ -118,7 +118,7 @@ func TestLogin_workingLoginAndLogout(t *testing.T) {
 		return 23, nil
 	}
 	resp := testClient.PostForm("/login", vals)
-	a.Equal(http.StatusTemporaryRedirect, resp.Code)
+	a.Equal(http.StatusSeeOther, resp.Code)
 	a.True(called)
 	newCookie := resp.Header().Get("Set-Cookie")
 	a.Contains(newCookie, defaultSessionName)

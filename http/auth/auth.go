@@ -42,8 +42,8 @@ type Handler struct {
 	auther Auther
 	store  sessions.Store
 
-	// the url to redirect to after login/logout
-	landing string
+	redirLanding string // the url to redirect to after login
+	redirLogout  string // the url to redirect to after logout
 
 	// how long should a session life
 	lifetime time.Duration
@@ -52,7 +52,7 @@ type Handler struct {
 	sessionName string
 }
 
-func NewHandler(a Auther, options ...func(*Handler) error) (*Handler, error) {
+func NewHandler(a Auther, options ...Option) (*Handler, error) {
 	var ah Handler
 	ah.auther = a
 
@@ -71,8 +71,12 @@ func NewHandler(a Auther, options ...func(*Handler) error) (*Handler, error) {
 		ah.lifetime = 5 * time.Minute
 	}
 
-	if ah.landing == "" {
-		ah.landing = "/"
+	if ah.redirLanding == "" {
+		ah.redirLanding = "/"
+	}
+
+	if ah.redirLogout == "" {
+		ah.redirLogout = ah.redirLanding
 	}
 
 	if ah.sessionName == "" {
@@ -113,7 +117,7 @@ func (ah Handler) Authorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, ah.landing, http.StatusTemporaryRedirect)
+	http.Redirect(w, r, ah.redirLanding, http.StatusSeeOther)
 	return
 }
 
@@ -174,6 +178,6 @@ func (ah Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, ah.landing, http.StatusTemporaryRedirect)
+	http.Redirect(w, r, ah.redirLogout, http.StatusSeeOther)
 	return
 }
