@@ -7,11 +7,15 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/rs/xlog"
 	"gopkg.in/errgo.v1"
 )
 
-var closeChan chan<- os.Signal
+var (
+	conf *xlog.Config
+
+	closeChan chan<- os.Signal
+)
 
 func SetCloseChan(c chan<- os.Signal) {
 	closeChan = c
@@ -33,41 +37,67 @@ func CheckFatal(err error) {
 			dotName := filepath.Ext(fn.Name())
 			fnName = strings.TrimLeft(dotName, ".") + "()"
 		}
-		logrus.Errorf("%s:%d %s", file, line, fnName)
-		logrus.Error("Fatal Error:", errgo.Details(err))
+		xlog.Errorf("%s:%d %s", file, line, fnName)
+		xlog.Error("Fatal Error:", errgo.Details(err))
 		if closeChan != nil {
-			logrus.Warn("Sending close message")
+			xlog.Warn("Sending close message")
 			closeChan <- os.Interrupt
 		}
 		os.Exit(1)
 	}
 }
 
-var Underlying = logrus.New()
-
 // SetupLogging will initialize the logger backend and set the flags.
 func SetupLogging(w io.Writer) {
+	if conf != nil {
+		xlog.Error("logging: initializing twice! skipping...")
+		return
+	}
+	conf = new(xlog.Config)
+	var outs xlog.MultiOutput
+	outs = append(outs, xlog.NewConsoleOutput())
 	if w != nil {
-		Underlying.Out = io.MultiWriter(os.Stderr, w)
+		outs = append(outs, xlog.NewLogfmtOutput(w))
 	}
-	if runtime.GOOS == "windows" { // colored ttys are rare on windows...
-		Underlying.Formatter = &logrus.TextFormatter{DisableColors: true}
-	}
+	// if runtime.GOOS == "windows" { // colored ttys are rare on windows...
+	// 	Underlying.Formatter = &logrus.TextFormatter{DisableColors: true}
+	// }
+	conf.Level = xlog.LevelWarn
 	if lvl := os.Getenv("CRYPTIX_LOGLVL"); lvl != "" {
-		l, err := logrus.ParseLevel(lvl)
-		if err != nil {
-			logrus.Errorf("logging: could not parse lvl from env, defaulting to debug: %s", err)
-			l = logrus.DebugLevel
+		var ok bool
+		conf.Level, ok = map[string]xlog.Level{
+			"debug": xlog.LevelDebug,
+			"info":  xlog.LevelInfo,
+			"error": xlog.LevelError,
+		}[strings.ToLower(lvl)]
+		if !ok {
+			xlog.Warn("logging: could not match loglvl from env, defaulting to debug")
+			conf.Level = xlog.LevelDebug
 		}
-		Underlying.Level = l
 	}
+	conf.Output = outs
+	xlog.SetLogger(xlog.New(*conf))
 }
 
 // Logger returns an Entry where the module field is set to name
-func Logger(name string) *logrus.Entry {
+func Logger(name string) xlog.Logger {
+	if conf == nil {
+		xlog.Error("logging: not initialized")
+		os.Exit(1)
+	}
 	if name == "" {
-		Underlying.Warn("missing name parameter")
+		xlog.Warn("loging: missing name parameter")
 		name = "undefined"
 	}
-	return Underlying.WithField("module", name)
+	var thisConf = *conf // copy the logger
+	// don't trash it's fields
+	switch {
+	case len(thisConf.Fields) == 0:
+		thisConf.Fields = xlog.F{
+			"unit": name,
+		}
+	case len(thisConf.Fields) > 0:
+		thisConf.Fields["unit"] = name
+	}
+	return xlog.New(thisConf)
 }

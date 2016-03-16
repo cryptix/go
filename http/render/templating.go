@@ -11,10 +11,13 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/cryptix/go/logging"
 	"github.com/gorilla/mux"
 	"github.com/oxtoacart/bpool"
+	"github.com/rs/xlog"
 	"github.com/shurcooL/httpfs/html/vfstemplate"
 	"gopkg.in/errgo.v1"
 )
@@ -23,7 +26,7 @@ var (
 	// Reload is whether to reload templates on each request.
 	Reload bool
 
-	log = logging.Logger("render")
+	// log = logging.Logger("render")
 
 	assets http.FileSystem
 
@@ -95,7 +98,7 @@ func parseHTMLTemplates() error {
 // Render takes a template name and any kind of named data
 // renders the template to a buffer from the pool
 // and writes that to the http response
-func Render(w http.ResponseWriter, r *http.Request, name string, status int, data interface{}) error {
+func Render(ctx context.Context, w http.ResponseWriter, r *http.Request, name string, status int, data interface{}) error {
 	tmpl, ok := templates[name]
 	if !ok {
 		return errors.New("Could not find template:" + name)
@@ -114,24 +117,24 @@ func Render(w http.ResponseWriter, r *http.Request, name string, status int, dat
 	w.WriteHeader(status)
 	_, err = buf.WriteTo(w)
 	bufpool.Put(buf)
-	log.WithFields(logrus.Fields{
+	xlog.FromContext(ctx).Debug("Rendered", xlog.F{
 		"name":   name,
 		"status": status,
 		"took":   time.Since(start),
-	}).Debug("Rendered")
+	})
 	return err
 }
 
 // PlainError helps rendering user errors
-func PlainError(w http.ResponseWriter, statusCode int, err error) {
-	log.WithFields(logrus.Fields{
+func PlainError(ctx context.Context, w http.ResponseWriter, statusCode int, err error) {
+	xlog.FromContext(ctx).Error("PlainError", logrus.Fields{
 		"status": statusCode,
 		"err":    errgo.Details(err),
-	}).Error("PlainError")
+	})
 	http.Error(w, err.Error(), statusCode)
 }
 
-func logError(req *http.Request, err error, rv interface{}) {
+func logError(ctx context.Context, req *http.Request, err error, rv interface{}) {
 	if err != nil {
 		buf := bufpool.Get()
 		fmt.Fprintf(buf, "Error serving %s: %s", req.URL, err)
@@ -139,7 +142,7 @@ func logError(req *http.Request, err error, rv interface{}) {
 			fmt.Fprintln(buf, rv)
 			buf.Write(debug.Stack())
 		}
-		log.Error(buf.String())
+		xlog.FromContext(ctx).Error(buf.String())
 		bufpool.Put(buf)
 	}
 }
@@ -147,10 +150,10 @@ func logError(req *http.Request, err error, rv interface{}) {
 func urlTo(routeName string, ps ...interface{}) *url.URL {
 	route := appRouter.Get(routeName)
 	if route == nil {
-		log.WithFields(logrus.Fields{
+		xlog.Warn("no such route", xlog.F{
 			"route":  routeName,
 			"params": ps,
-		}).Warning("no such route")
+		})
 		return &url.URL{}
 	}
 
@@ -163,21 +166,19 @@ func urlTo(routeName string, ps ...interface{}) *url.URL {
 			params = append(params, strconv.Itoa(v))
 		case int64:
 			params = append(params, strconv.FormatInt(v, 10))
-
 		default:
-			log.Errorf("invalid param type %v in route %q", p, routeName)
+			xlog.Errorf("invalid param type %v in route %q", p, routeName)
 			logging.CheckFatal(errors.New("invalid param"))
 		}
 	}
 
 	u, err := route.URLPath(params...)
 	if err != nil {
-		log.WithFields(logrus.Fields{
+		xlog.Error("render: no such route", xlog.F{
 			"route":  routeName,
 			"params": params,
 			"error":  err,
-		}).Warning("no such route")
-		log.Error("Route error: failed to make URL")
+		})
 		return &url.URL{}
 	}
 	return u

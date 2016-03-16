@@ -6,9 +6,12 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
+	"golang.org/x/net/context"
 )
 
 func TestRender(t *testing.T) {
+	ctx := context.Background()
+
 	r := mux.NewRouter()
 	Init(http.Dir("tests"), []string{"/base.tmpl", "/extra.tmpl"})
 	AddTemplates([]string{
@@ -23,7 +26,7 @@ func TestRender(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := Render(rw, req, "/test1.tmpl", http.StatusOK, nil); err != nil {
+	if err := Render(ctx, rw, req, "/test1.tmpl", http.StatusOK, nil); err != nil {
 		t.Fatal(err)
 	}
 	// TODO(cryptix): parse html with goquery
