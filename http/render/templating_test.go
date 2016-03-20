@@ -1,33 +1,70 @@
 package render
 
 import (
+	"html/template"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
-	"github.com/gorilla/mux"
+	"github.com/PuerkitoBio/goquery"
 	"golang.org/x/net/context"
 )
 
 func TestRender(t *testing.T) {
 	ctx := context.Background()
-
-	r := mux.NewRouter()
-	Init(http.Dir("tests"), []string{"/base.tmpl", "/extra.tmpl"})
-	AddTemplates([]string{
-		"/test1.tmpl",
-		"/error.tmpl",
-	})
-	SetAppRouter(r)
-	Load()
-
+	r, err := New(http.Dir("tests"), "base.tmpl",
+		AddTemplates("test1.tmpl"),
+	)
+	if err != nil {
+		t.Fatal("New() failed", err)
+	}
 	rw := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", "/test", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := Render(ctx, rw, req, "/test1.tmpl", http.StatusOK, nil); err != nil {
+	if err := r.Render(ctx, rw, req, "test1.tmpl", http.StatusOK, nil); err != nil {
 		t.Fatal(err)
 	}
-	// TODO(cryptix): parse html with goquery
+	if rw.Code != http.StatusOK {
+		t.Fatal("wrong status")
+	}
+	doc, err := goquery.NewDocumentFromReader(rw.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if title := doc.Find("title").Text(); title != "render - tests" {
+		t.Fatalf("wrong Title. got: %s", title)
+	}
+	if hello := doc.Find("#hello").Text(); hello != "Hello" {
+		t.Fatalf("wrong hello. got: %s", hello)
+	}
+	if testID := doc.Find("#testID").Text(); testID != "Test2" {
+		t.Fatalf("wrong testID. got: %s", testID)
+	}
+}
+
+func TestFuncMap(t *testing.T) {
+	ctx := context.Background()
+	r, err := New(http.Dir("tests"), "base.tmpl",
+		AddTemplates("testFuncMap.tmpl"),
+		FuncMap(template.FuncMap{
+			"itoa": strconv.Itoa,
+		}),
+	)
+	if err != nil {
+		t.Fatal("New() failed", err)
+	}
+	rw := httptest.NewRecorder()
+	req, err := http.NewRequest("GET", "/test", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Render(ctx, rw, req, "testFuncMap.tmpl", http.StatusOK, nil); err != nil {
+		t.Fatal(err)
+	}
+	if rw.Code != http.StatusOK {
+		t.Fatal("wrong status")
+	}
 }

@@ -1,15 +1,13 @@
-{{ define "base" }}
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
-  {{ template "title" . }}
+  <title>{{block "title" .}}Default Title{{end}}</title>
 </head>
 <body>
-  {{ template "extra" .}}
+  {{block "extra" .}}{{end}}
   <div class="container">
-    {{ template "content" . }}
+    {{ block "content" . }}{{end}}
   </div>
 </body>
 </html>
-{{ end }}

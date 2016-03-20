@@ -12,7 +12,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/rs/xlog"
 	"golang.org/x/net/context"
+	"gopkg.in/errgo.v1"
 )
 
 // Binary sets Content-Description and Content-Transfer-Encoding
@@ -23,52 +25,17 @@ func (h Binary) ServeHTTPC(ctx context.Context, resp http.ResponseWriter, req *h
 	resp.Header().Set("Content-Description", "File Transfer")
 	resp.Header().Set("Content-Transfer-Encoding", "binary")
 	if err := h(ctx, resp, req); err != nil {
-		logError(ctx, req, err, nil)
+		fmt.Fprintf(resp, "Error serving %s: %s", req.URL, err)
+		xlog.FromContext(ctx).Error(err)
 		http.Error(resp, err.Error(), http.StatusInternalServerError)
 	}
 }
 
-// HTML expects render.Render to be called in it's wrapped handler.
-// if h returns an error, RenderError is called to render it.
-type HTML func(ctx context.Context, resp http.ResponseWriter, req *http.Request) error
-
-func (h HTML) ServeHTTPC(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-	if Reload { // TODO: kill globals
-		Load()
-	}
-
-	// resp.Header().Set("Content-Type","text/html")
-	if err := h(ctx, resp, req); err != nil {
-		logError(ctx, req, err, nil)
-		Error(ctx, resp, req, http.StatusInternalServerError, err)
-	}
-}
-
-// StaticHTML just renders a template without any extra data
-type StaticHTML string
-
-func (tpl StaticHTML) ServeHTTPC(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
-	if Reload {
-		Load()
-	}
-
-	err := Render(ctx, resp, req, string(tpl), http.StatusOK, nil)
-	if err != nil {
-		logError(ctx, req, err, nil)
-		Error(ctx, resp, req, http.StatusInternalServerError, err)
-	}
-}
-
-// Error uses 'error.tmpl' to output an error in HTML format
-func Error(ctx context.Context, w http.ResponseWriter, r *http.Request, status int, err error) {
-	w.Header().Set("cache-control", "no-cache")
-	err2 := Render(ctx, w, r, "/error.tmpl", status, map[string]interface{}{
-		"StatusCode": status,
-		"Status":     http.StatusText(status),
-		"Err":        err,
+// PlainError helps rendering user errors
+func PlainError(ctx context.Context, w http.ResponseWriter, statusCode int, err error) {
+	xlog.FromContext(ctx).Error("PlainError", xlog.F{
+		"status": statusCode,
+		"err":    errgo.Details(err),
 	})
-	if err2 != nil {
-		logError(ctx, r, fmt.Errorf("during execution of error template: %s", err2), nil)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	http.Error(w, err.Error(), statusCode)
 }

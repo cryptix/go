@@ -1,122 +1,115 @@
 package render
 
 import (
-	"errors"
 	"fmt"
-	htmpl "html/template"
+	"html/template"
 	"net/http"
-	"net/url"
 	"runtime/debug"
-	"strconv"
-	"strings"
 	"time"
 
-	"golang.org/x/net/context"
-
-	"github.com/Sirupsen/logrus"
-	"github.com/cryptix/go/logging"
-	"github.com/gorilla/mux"
 	"github.com/oxtoacart/bpool"
+	"github.com/rs/xhandler"
 	"github.com/rs/xlog"
 	"github.com/shurcooL/httpfs/html/vfstemplate"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 )
 
-var (
-	// Reload is whether to reload templates on each request.
-	Reload bool
-
-	// log = logging.Logger("render")
+type Renderer struct {
+	doReload bool // Reload is whether to reload templates on each request.
 
 	assets http.FileSystem
 
 	// files
-	templateFiles     []string
-	baseTemplateFiles []string
+	templateFiles []string
+	baseTemplate  string
 
-	// all the templates that we parsed
-	templates = map[string]*htmpl.Template{}
+	funcMap   template.FuncMap
+	templates map[string]*template.Template
 
 	// bufpool is shared between all render() calls
-	bufpool = bpool.NewBufferPool(64)
-
-	appRouter *mux.Router
-)
-
-// Init takes a go-bindata Asset function and base tempaltes, which are used to render other templates
-func Init(fs http.FileSystem, base []string) {
-	assets = fs
-	baseTemplateFiles = append(baseTemplateFiles, base...)
+	bufpool *bpool.BufferPool
 }
 
-// AddTemplates adds filenames for the next call to parseTempaltes
-func AddTemplates(files []string) {
-	templateFiles = append(templateFiles, files...)
-}
-
-// SetAppRouter is used to specify toe mux.Router, it's needed for the {{urlTo}} template func
-func SetAppRouter(r *mux.Router) {
-	appRouter = r
-}
-
-// Load loads and parses all templates that are in the assetFunc
-func Load() {
-	if appRouter == nil {
-		logging.CheckFatal(errgo.New("No appRouter set"))
+// New creates a new Renderer
+func New(fs http.FileSystem, base string, opts ...Option) (*Renderer, error) {
+	r := &Renderer{
+		assets:       fs,
+		baseTemplate: base,
+		bufpool:      bpool.NewBufferPool(64),
+		templates:    make(map[string]*template.Template),
 	}
-
-	if len(baseTemplateFiles) == 0 {
-		logging.CheckFatal(errgo.New("No base tempaltes"))
-		// baseTemplateFiles = []string{"navbar.tmpl", "base.tmpl"}
+	for i, o := range opts {
+		if err := o(r); err != nil {
+			return nil, errgo.Notef(err, "render: option %i failed.", i)
+		}
 	}
-
-	logging.CheckFatal(parseHTMLTemplates())
+	return r, r.parseHTMLTemplates()
 }
 
-func parseHTMLTemplates() error {
-	for _, file := range templateFiles {
-		t := htmpl.New("").Funcs(htmpl.FuncMap{
-			"urlTo": urlTo,
-			"itoa":  strconv.Itoa,
+func (r *Renderer) GetReloader() func(xhandler.HandlerC) xhandler.HandlerC {
+	return func(next xhandler.HandlerC) xhandler.HandlerC {
+		return xhandler.HandlerFuncC(func(ctx context.Context, rw http.ResponseWriter, req *http.Request) {
+			if err := r.Reload(); err != nil {
+				err = errgo.Notef(err, "could not parse template")
+				r.Error(ctx, rw, req, http.StatusInternalServerError, err)
+				return
+			}
+			next.ServeHTTPC(ctx, rw, req)
 		})
-		var err error
-		t, err = vfstemplate.ParseFiles(assets, t, append(baseTemplateFiles, file)...)
-		if err != nil {
-			return errgo.Notef(err, "template %s", file)
-		}
+	}
+}
 
-		t = t.Lookup("base")
-		if t == nil {
-			return errgo.Newf("base template not found in %v", file)
-		}
-		// TODO(cryptix): refactor all of this.. maybe templateName > path?
-		templates[strings.TrimPrefix(file, "/tmpl")] = t
+func (r *Renderer) Reload() error {
+	if r.doReload {
+		return r.parseHTMLTemplates()
 	}
 	return nil
 }
 
-// Render takes a template name and any kind of named data
-// renders the template to a buffer from the pool
-// and writes that to the http response
-func Render(ctx context.Context, w http.ResponseWriter, r *http.Request, name string, status int, data interface{}) error {
-	tmpl, ok := templates[name]
+type RenderFunc func(ctx context.Context, w http.ResponseWriter, req *http.Request) (interface{}, error)
+
+func (r *Renderer) HTML(name string, f RenderFunc) xhandler.HandlerC {
+	return xhandler.HandlerFuncC(func(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+		data, err := f(ctx, w, req)
+		if err != nil {
+			r.Error(ctx, w, req, http.StatusInternalServerError, err)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html")
+		if err := r.Render(ctx, w, req, name, http.StatusOK, data); err != nil {
+			r.Error(ctx, w, req, http.StatusInternalServerError, err)
+			return
+		}
+	})
+}
+
+func (r *Renderer) StaticHTML(name string) xhandler.HandlerC {
+	return xhandler.HandlerFuncC(func(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+		err := r.Render(ctx, w, req, name, http.StatusOK, nil)
+		if err != nil {
+			r.Error(ctx, w, req, http.StatusInternalServerError, err)
+		}
+	})
+}
+
+func (r *Renderer) Render(ctx context.Context, w http.ResponseWriter, req *http.Request, name string, status int, data interface{}) error {
+	l := xlog.FromContext(ctx)
+	t, ok := r.templates[name]
 	if !ok {
-		return errors.New("Could not find template:" + name)
+		return errgo.New("Could not find template:" + name)
 	}
 	start := time.Now()
-
-	buf := bufpool.Get()
-	err := tmpl.ExecuteTemplate(buf, "base", data)
+	l.SetField("tpl", name)
+	buf := r.bufpool.Get()
+	err := t.ExecuteTemplate(buf, r.baseTemplate, data)
 	if err != nil {
 		return err
 	}
-
-	start = time.Now()
-
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
 	_, err = buf.WriteTo(w)
-	bufpool.Put(buf)
+	r.bufpool.Put(buf)
 	xlog.FromContext(ctx).Debug("Rendered", xlog.F{
 		"name":   name,
 		"status": status,
@@ -125,61 +118,47 @@ func Render(ctx context.Context, w http.ResponseWriter, r *http.Request, name st
 	return err
 }
 
-// PlainError helps rendering user errors
-func PlainError(ctx context.Context, w http.ResponseWriter, statusCode int, err error) {
-	xlog.FromContext(ctx).Error("PlainError", logrus.Fields{
-		"status": statusCode,
-		"err":    errgo.Details(err),
+func (r *Renderer) Error(ctx context.Context, w http.ResponseWriter, req *http.Request, status int, err error) {
+	r.logError(ctx, req, err, nil)
+	w.Header().Set("cache-control", "no-cache")
+	err2 := r.Render(ctx, w, req, "/error.tmpl", status, map[string]interface{}{
+		"StatusCode": status,
+		"Status":     http.StatusText(status),
+		"Err":        err,
 	})
-	http.Error(w, err.Error(), statusCode)
+	if err2 != nil {
+		err = errgo.WithCausef(err, err2, "render: during execution of error template.")
+		r.logError(ctx, req, err, nil)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
-func logError(ctx context.Context, req *http.Request, err error, rv interface{}) {
+func (r *Renderer) parseHTMLTemplates() error {
+	var err error
+	funcTpl := template.New("").Funcs(r.funcMap)
+	for _, tf := range r.templateFiles {
+		t, err := vfstemplate.ParseFiles(r.assets, funcTpl, r.baseTemplate, tf)
+		if err != nil {
+			return errgo.Notef(err, "render: failed to parse template %s", tf)
+		}
+		r.templates[tf] = t
+		xlog.Debug("parsed", xlog.F{
+			"name": t.Name(),
+			"tf":   tf,
+		})
+	}
+	return err
+}
+
+func (r *Renderer) logError(ctx context.Context, req *http.Request, err error, rv interface{}) {
 	if err != nil {
-		buf := bufpool.Get()
+		buf := r.bufpool.Get()
 		fmt.Fprintf(buf, "Error serving %s: %s", req.URL, err)
 		if rv != nil {
 			fmt.Fprintln(buf, rv)
 			buf.Write(debug.Stack())
 		}
 		xlog.FromContext(ctx).Error(buf.String())
-		bufpool.Put(buf)
+		r.bufpool.Put(buf)
 	}
-}
-
-func urlTo(routeName string, ps ...interface{}) *url.URL {
-	route := appRouter.Get(routeName)
-	if route == nil {
-		xlog.Warn("no such route", xlog.F{
-			"route":  routeName,
-			"params": ps,
-		})
-		return &url.URL{}
-	}
-
-	var params []string
-	for _, p := range ps {
-		switch v := p.(type) {
-		case string:
-			params = append(params, v)
-		case int:
-			params = append(params, strconv.Itoa(v))
-		case int64:
-			params = append(params, strconv.FormatInt(v, 10))
-		default:
-			xlog.Errorf("invalid param type %v in route %q", p, routeName)
-			logging.CheckFatal(errors.New("invalid param"))
-		}
-	}
-
-	u, err := route.URLPath(params...)
-	if err != nil {
-		xlog.Error("render: no such route", xlog.F{
-			"route":  routeName,
-			"params": params,
-			"error":  err,
-		})
-		return &url.URL{}
-	}
-	return u
 }
