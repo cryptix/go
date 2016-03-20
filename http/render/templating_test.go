@@ -14,7 +14,7 @@ import (
 
 func TestRender(t *testing.T) {
 	ctx := context.Background()
-	r, err := New(http.Dir("tests"), "base.tmpl",
+	r, err := New(http.Dir("tests"),
 		AddTemplates("test1.tmpl"),
 	)
 	if err != nil {
@@ -48,7 +48,7 @@ func TestRender(t *testing.T) {
 
 func TestFuncMap(t *testing.T) {
 	ctx := context.Background()
-	r, err := New(http.Dir("tests"), "base.tmpl",
+	r, err := New(http.Dir("tests"),
 		AddTemplates("testFuncMap.tmpl"),
 		FuncMap(template.FuncMap{
 			"itoa": strconv.Itoa,
@@ -72,7 +72,7 @@ func TestFuncMap(t *testing.T) {
 
 func TestBugOverride(t *testing.T) {
 	ctx := context.Background()
-	r, err := New(http.Dir("tests"), "base.tmpl",
+	r, err := New(http.Dir("tests"),
 		AddTemplates("testFuncMap.tmpl", "bug1.tmpl"),
 		FuncMap(template.FuncMap{"itoa": strconv.Itoa}),
 	)

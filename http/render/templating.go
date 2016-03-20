@@ -36,17 +36,22 @@ type Renderer struct {
 }
 
 // New creates a new Renderer
-func New(fs http.FileSystem, base string, opts ...Option) (*Renderer, error) {
+func New(fs http.FileSystem, opts ...Option) (*Renderer, error) {
 	r := &Renderer{
-		assets:       fs,
-		baseTemplate: base,
-		bufpool:      bpool.NewBufferPool(64),
-		templates:    make(map[string]*template.Template),
+		assets:    fs,
+		bufpool:   bpool.NewBufferPool(64),
+		templates: make(map[string]*template.Template),
 	}
 	for i, o := range opts {
 		if err := o(r); err != nil {
 			return nil, errgo.Notef(err, "render: option %i failed.", i)
 		}
+	}
+
+	// todo defaults
+
+	if r.baseTemplate == "" {
+		r.baseTemplate = "base.tmpl"
 	}
 	return r, r.parseHTMLTemplates()
 }
@@ -56,7 +61,7 @@ func (r *Renderer) GetReloader() func(xhandler.HandlerC) xhandler.HandlerC {
 	return func(next xhandler.HandlerC) xhandler.HandlerC {
 		return xhandler.HandlerFuncC(func(ctx context.Context, rw http.ResponseWriter, req *http.Request) {
 			if err := r.Reload(); err != nil {
-				err = errgo.Notef(err, "could not parse template")
+				err = errgo.Notef(err, "render: could not reload templates")
 				r.Error(ctx, rw, req, http.StatusInternalServerError, err)
 				return
 			}
@@ -69,6 +74,7 @@ func (r *Renderer) Reload() error {
 	if r.doReload {
 		r.mu.RLock()
 		if r.reloading {
+			r.mu.RUnlock()
 			return nil
 		}
 		r.mu.RUnlock()
@@ -109,7 +115,7 @@ func (r *Renderer) Render(ctx context.Context, w http.ResponseWriter, req *http.
 	l := xlog.FromContext(ctx)
 	t, ok := r.templates[name]
 	if !ok {
-		return errgo.New("Could not find template:" + name)
+		return errgo.New("render: could not find template:" + name)
 	}
 	start := time.Now()
 	l.SetField("tpl", name)
@@ -122,7 +128,7 @@ func (r *Renderer) Render(ctx context.Context, w http.ResponseWriter, req *http.
 	w.WriteHeader(status)
 	_, err = buf.WriteTo(w)
 	r.bufpool.Put(buf)
-	xlog.FromContext(ctx).Debug("Rendered", xlog.F{
+	l.Debug("Rendered", xlog.F{
 		"name":   name,
 		"status": status,
 		"took":   time.Since(start),
@@ -161,10 +167,6 @@ func (r *Renderer) parseHTMLTemplates() error {
 			return errgo.Notef(err, "render: failed to parse template %s", tf)
 		}
 		r.templates[tf] = t
-		xlog.Debug("parsed", xlog.F{
-			"name": t.Name(),
-			"tf":   tf,
-		})
 	}
 	r.reloading = false
 	return err

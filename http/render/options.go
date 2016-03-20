@@ -12,6 +12,13 @@ func AddTemplates(files ...string) Option {
 	}
 }
 
+func BaseTemplate(base string) Option {
+	return func(r *Renderer) error {
+		r.baseTemplate = base
+		return nil
+	}
+}
+
 func FuncMap(m template.FuncMap) Option {
 	return func(r *Renderer) error {
 		r.funcMap = m
