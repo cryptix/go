@@ -81,23 +81,18 @@ func SetupLogging(w io.Writer) {
 
 // Logger returns an Entry where the module field is set to name
 func Logger(name string) xlog.Logger {
-	if conf == nil {
-		xlog.Error("logging: not initialized")
-		os.Exit(1)
-	}
 	if name == "" {
 		xlog.Warn("loging: missing name parameter")
 		name = "undefined"
 	}
-	var thisConf = *conf // copy the logger
-	// don't trash it's fields
-	switch {
-	case len(thisConf.Fields) == 0:
-		thisConf.Fields = xlog.F{
-			"unit": name,
+	var thisConf = conf
+	if thisConf == nil {
+		xlog.Warn("logging: not initialized yet.", xlog.F{"name": name})
+		thisConf = &xlog.Config{
+			Output: xlog.NewConsoleOutput(),
 		}
-	case len(thisConf.Fields) > 0:
-		thisConf.Fields["unit"] = name
 	}
-	return xlog.New(thisConf)
+	l := xlog.New(*thisConf)
+	l.SetField("unit", name)
+	return l
 }
