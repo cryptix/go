@@ -1,7 +1,7 @@
 package logging
 
 import (
-	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -48,35 +48,38 @@ func CheckFatal(err error) {
 }
 
 // SetupLogging will initialize the logger backend and set the flags.
-func SetupLogging(w io.Writer) {
+func SetupLogging(c *xlog.Config) {
 	if conf != nil {
 		xlog.Error("logging: initializing twice! skipping...")
 		return
 	}
-	conf = new(xlog.Config)
-	var outs xlog.MultiOutput
-	outs = append(outs, xlog.NewConsoleOutput())
-	if w != nil {
-		outs = append(outs, xlog.NewLogfmtOutput(w))
+
+	// defaults
+	if c == nil {
+		c = new(xlog.Config)
+		c.Output = xlog.NewConsoleOutput()
 	}
-	// if runtime.GOOS == "windows" { // colored ttys are rare on windows...
-	// 	Underlying.Formatter = &logrus.TextFormatter{DisableColors: true}
-	// }
-	conf.Level = xlog.LevelWarn
+
+	c.Level = xlog.LevelInfo
 	if lvl := os.Getenv("CRYPTIX_LOGLVL"); lvl != "" {
 		var ok bool
-		conf.Level, ok = map[string]xlog.Level{
+		c.Level, ok = map[string]xlog.Level{
 			"debug": xlog.LevelDebug,
 			"info":  xlog.LevelInfo,
 			"error": xlog.LevelError,
 		}[strings.ToLower(lvl)]
 		if !ok {
 			xlog.Warn("logging: could not match loglvl from env, defaulting to debug")
-			conf.Level = xlog.LevelDebug
+			c.Level = xlog.LevelDebug
 		}
 	}
-	conf.Output = outs
-	xlog.SetLogger(xlog.New(*conf))
+	conf = c
+	l := xlog.New(*conf)
+	// Plug the xlog handler's input to Go's default logger
+	log.SetFlags(0)
+	log.SetOutput(l)
+
+	xlog.SetLogger(l)
 }
 
 // Logger returns an Entry where the module field is set to name
