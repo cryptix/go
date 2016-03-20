@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"net/http"
 	"runtime/debug"
+	"sync"
 	"time"
 
 	"github.com/oxtoacart/bpool"
@@ -16,19 +17,22 @@ import (
 )
 
 type Renderer struct {
-	doReload bool // Reload is whether to reload templates on each request.
-
 	assets http.FileSystem
 
 	// files
 	templateFiles []string
 	baseTemplate  string
 
-	funcMap   template.FuncMap
-	templates map[string]*template.Template
+	funcMap template.FuncMap
 
 	// bufpool is shared between all render() calls
 	bufpool *bpool.BufferPool
+
+	doReload bool // Reload is whether to reload templates on each request.
+
+	mu        sync.RWMutex // protect concurrent map access
+	reloading bool
+	templates map[string]*template.Template
 }
 
 // New creates a new Renderer
@@ -48,6 +52,7 @@ func New(fs http.FileSystem, base string, opts ...Option) (*Renderer, error) {
 }
 
 func (r *Renderer) GetReloader() func(xhandler.HandlerC) xhandler.HandlerC {
+	r.doReload = true
 	return func(next xhandler.HandlerC) xhandler.HandlerC {
 		return xhandler.HandlerFuncC(func(ctx context.Context, rw http.ResponseWriter, req *http.Request) {
 			if err := r.Reload(); err != nil {
@@ -62,6 +67,11 @@ func (r *Renderer) GetReloader() func(xhandler.HandlerC) xhandler.HandlerC {
 
 func (r *Renderer) Reload() error {
 	if r.doReload {
+		r.mu.RLock()
+		if r.reloading {
+			return nil
+		}
+		r.mu.RUnlock()
 		return r.parseHTMLTemplates()
 	}
 	return nil
@@ -94,6 +104,8 @@ func (r *Renderer) StaticHTML(name string) xhandler.HandlerC {
 }
 
 func (r *Renderer) Render(ctx context.Context, w http.ResponseWriter, req *http.Request, name string, status int, data interface{}) error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	l := xlog.FromContext(ctx)
 	t, ok := r.templates[name]
 	if !ok {
@@ -134,6 +146,9 @@ func (r *Renderer) Error(ctx context.Context, w http.ResponseWriter, req *http.R
 }
 
 func (r *Renderer) parseHTMLTemplates() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.reloading = true
 	var err error
 	funcTpl := template.New("").Funcs(r.funcMap)
 	for _, tf := range r.templateFiles {
@@ -151,6 +166,7 @@ func (r *Renderer) parseHTMLTemplates() error {
 			"tf":   tf,
 		})
 	}
+	r.reloading = false
 	return err
 }
 
