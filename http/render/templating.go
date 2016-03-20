@@ -137,7 +137,11 @@ func (r *Renderer) parseHTMLTemplates() error {
 	var err error
 	funcTpl := template.New("").Funcs(r.funcMap)
 	for _, tf := range r.templateFiles {
-		t, err := vfstemplate.ParseFiles(r.assets, funcTpl, r.baseTemplate, tf)
+		ftc, err := funcTpl.Clone()
+		if err != nil {
+			return errgo.Notef(err, "render: could not clone func template")
+		}
+		t, err := vfstemplate.ParseFiles(r.assets, ftc, r.baseTemplate, tf)
 		if err != nil {
 			return errgo.Notef(err, "render: failed to parse template %s", tf)
 		}

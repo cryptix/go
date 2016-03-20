@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
@@ -66,5 +67,30 @@ func TestFuncMap(t *testing.T) {
 	}
 	if rw.Code != http.StatusOK {
 		t.Fatal("wrong status")
+	}
+}
+
+func TestBugOverride(t *testing.T) {
+	ctx := context.Background()
+	r, err := New(http.Dir("tests"), "base.tmpl",
+		AddTemplates("testFuncMap.tmpl", "bug1.tmpl"),
+		FuncMap(template.FuncMap{"itoa": strconv.Itoa}),
+	)
+	if err != nil {
+		t.Fatal("New() failed", err)
+	}
+	rw := httptest.NewRecorder()
+	req, err := http.NewRequest("GET", "/test", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Render(ctx, rw, req, "testFuncMap.tmpl", http.StatusOK, nil); err != nil {
+		t.Fatal(err)
+	}
+	if rw.Code != http.StatusOK {
+		t.Fatal("wrong status")
+	}
+	if !strings.Contains(rw.Body.String(), "42") {
+		t.Fatal("first doesn't contain 42")
 	}
 }
