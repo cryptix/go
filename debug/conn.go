@@ -1,31 +1,24 @@
 package debug
 
 import (
-	"io"
 	"log"
 	"net"
 	"time"
 )
 
 type Conn struct {
-	io.Reader
-	io.Writer
+	RWC
 	conn net.Conn
 }
 
 func WrapConn(c net.Conn) *Conn {
-	rl := NewReadLogger("<", c)
-	wl := NewWriteLogger(">", c)
-
-	return &Conn{
-		Reader: rl,
-		Writer: wl,
-		conn:   c,
+	wrap := Conn{
+		conn: c,
 	}
-}
-
-func (c *Conn) Close() error {
-	return c.conn.Close()
+	wrap.Reader = NewReadLogger("<", c)
+	wrap.Writer = NewWriteLogger(">", c)
+	wrap.RWC.c = c
+	return &wrap
 }
 
 func (c *Conn) LocalAddr() net.Addr {
