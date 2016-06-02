@@ -9,10 +9,8 @@ import (
 	"time"
 
 	"github.com/oxtoacart/bpool"
-	"github.com/rs/xhandler"
 	"github.com/rs/xlog"
 	"github.com/shurcooL/httpfs/html/vfstemplate"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 )
 
@@ -56,16 +54,16 @@ func New(fs http.FileSystem, opts ...Option) (*Renderer, error) {
 	return r, r.parseHTMLTemplates()
 }
 
-func (r *Renderer) GetReloader() func(xhandler.HandlerC) xhandler.HandlerC {
+func (r *Renderer) GetReloader() func(http.Handler) http.Handler {
 	r.doReload = true
-	return func(next xhandler.HandlerC) xhandler.HandlerC {
-		return xhandler.HandlerFuncC(func(ctx context.Context, rw http.ResponseWriter, req *http.Request) {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 			if err := r.Reload(); err != nil {
 				err = errgo.Notef(err, "render: could not reload templates")
-				r.Error(ctx, rw, req, http.StatusInternalServerError, err)
+				r.Error(rw, req, http.StatusInternalServerError, err)
 				return
 			}
-			next.ServeHTTPC(ctx, rw, req)
+			next.ServeHTTP(rw, req)
 		})
 	}
 }
@@ -83,36 +81,36 @@ func (r *Renderer) Reload() error {
 	return nil
 }
 
-type RenderFunc func(ctx context.Context, w http.ResponseWriter, req *http.Request) (interface{}, error)
+type RenderFunc func(w http.ResponseWriter, req *http.Request) (interface{}, error)
 
-func (r *Renderer) HTML(name string, f RenderFunc) xhandler.HandlerC {
-	return xhandler.HandlerFuncC(func(ctx context.Context, w http.ResponseWriter, req *http.Request) {
-		data, err := f(ctx, w, req)
+func (r *Renderer) HTML(name string, f RenderFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		data, err := f(w, req)
 		if err != nil {
-			r.Error(ctx, w, req, http.StatusInternalServerError, err)
+			r.Error(w, req, http.StatusInternalServerError, err)
 			return
 		}
 		w.Header().Set("Content-Type", "text/html")
-		if err := r.Render(ctx, w, req, name, http.StatusOK, data); err != nil {
-			r.Error(ctx, w, req, http.StatusInternalServerError, err)
+		if err := r.Render(w, req, name, http.StatusOK, data); err != nil {
+			r.Error(w, req, http.StatusInternalServerError, err)
 			return
 		}
-	})
+	}
 }
 
-func (r *Renderer) StaticHTML(name string) xhandler.HandlerC {
-	return xhandler.HandlerFuncC(func(ctx context.Context, w http.ResponseWriter, req *http.Request) {
-		err := r.Render(ctx, w, req, name, http.StatusOK, nil)
+func (r *Renderer) StaticHTML(name string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		err := r.Render(w, req, name, http.StatusOK, nil)
 		if err != nil {
-			r.Error(ctx, w, req, http.StatusInternalServerError, err)
+			r.Error(w, req, http.StatusInternalServerError, err)
 		}
 	})
 }
 
-func (r *Renderer) Render(ctx context.Context, w http.ResponseWriter, req *http.Request, name string, status int, data interface{}) error {
+func (r *Renderer) Render(w http.ResponseWriter, req *http.Request, name string, status int, data interface{}) error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	l := xlog.FromContext(ctx)
+	l := xlog.FromContext(req.Context())
 	t, ok := r.templates[name]
 	if !ok {
 		return errgo.New("render: could not find template:" + name)
@@ -136,17 +134,17 @@ func (r *Renderer) Render(ctx context.Context, w http.ResponseWriter, req *http.
 	return err
 }
 
-func (r *Renderer) Error(ctx context.Context, w http.ResponseWriter, req *http.Request, status int, err error) {
-	r.logError(ctx, req, err, nil)
+func (r *Renderer) Error(w http.ResponseWriter, req *http.Request, status int, err error) {
+	r.logError(req, err, nil)
 	w.Header().Set("cache-control", "no-cache")
-	err2 := r.Render(ctx, w, req, "/error.tmpl", status, map[string]interface{}{
+	err2 := r.Render(w, req, "/error.tmpl", status, map[string]interface{}{
 		"StatusCode": status,
 		"Status":     http.StatusText(status),
 		"Err":        err,
 	})
 	if err2 != nil {
 		err = errgo.WithCausef(err, err2, "render: during execution of error template.")
-		r.logError(ctx, req, err, nil)
+		r.logError(req, err, nil)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -172,7 +170,7 @@ func (r *Renderer) parseHTMLTemplates() error {
 	return err
 }
 
-func (r *Renderer) logError(ctx context.Context, req *http.Request, err error, rv interface{}) {
+func (r *Renderer) logError(req *http.Request, err error, rv interface{}) {
 	if err != nil {
 		buf := r.bufpool.Get()
 		fmt.Fprintf(buf, "Error serving %s: %s", req.URL, err)
@@ -180,7 +178,7 @@ func (r *Renderer) logError(ctx context.Context, req *http.Request, err error, r
 			fmt.Fprintln(buf, rv)
 			buf.Write(debug.Stack())
 		}
-		xlog.FromContext(ctx).Error(buf.String())
+		xlog.FromContext(req.Context()).Error(buf.String())
 		r.bufpool.Put(buf)
 	}
 }
