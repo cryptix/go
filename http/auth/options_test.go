@@ -30,7 +30,7 @@ func TestOption_landing(t *testing.T) {
 		return 23, nil
 	}
 	resp := testClient.PostForm("/login", vals)
-	a.Equal(http.StatusFound, resp.Code)
+	a.Equal(http.StatusSeeOther, resp.Code)
 	a.Equal(want, resp.Header().Get("Location"))
 	a.True(called)
 	newCookie := resp.Header().Get("Set-Cookie")
@@ -59,13 +59,13 @@ func TestOption_logout(t *testing.T) {
 		return 23, nil
 	}
 	resp := testClient.PostForm("/login", vals)
-	a.Equal(http.StatusFound, resp.Code)
+	a.Equal(http.StatusSeeOther, resp.Code)
 	a.Equal("/landingRedir", resp.Header().Get("Location"))
 	a.True(called)
 	newCookie := resp.Header().Get("Set-Cookie")
 	a.Contains(newCookie, defaultSessionName)
 
 	resp = testClient.PostForm("/logout", nil)
-	a.Equal(http.StatusFound, resp.Code)
+	a.Equal(http.StatusSeeOther, resp.Code)
 	a.Equal(want, resp.Header().Get("Location"))
 }
