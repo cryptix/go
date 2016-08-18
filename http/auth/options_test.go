@@ -22,7 +22,7 @@ func TestOption_landing(t *testing.T) {
 		"pass": {"testPassw"},
 	}
 	called := false
-	testAuthProvider.check_ = func(u, p string) (interface{}, error) {
+	testAuthProvider.checkMock = func(u, p string) (interface{}, error) {
 		called = true
 		if !(u == "testUser" && p == "testPassw") {
 			return nil, ErrBadLogin
@@ -51,7 +51,7 @@ func TestOption_logout(t *testing.T) {
 		"pass": {"testPassw"},
 	}
 	called := false
-	testAuthProvider.check_ = func(u, p string) (interface{}, error) {
+	testAuthProvider.checkMock = func(u, p string) (interface{}, error) {
 		called = true
 		if !(u == "testUser" && p == "testPassw") {
 			return nil, ErrBadLogin

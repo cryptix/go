@@ -53,12 +53,12 @@ func teardown() {
 }
 
 type mockProvider struct {
-	check_ func(string, string) (interface{}, error)
+	checkMock func(string, string) (interface{}, error)
 }
 
 func (m mockProvider) Check(user, pass string) (interface{}, error) {
-	if m.check_ != nil {
-		return m.check_(user, pass)
+	if m.checkMock != nil {
+		return m.checkMock(user, pass)
 	}
 	return nil, errors.New("Not mocked!")
 }

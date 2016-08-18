@@ -38,7 +38,7 @@ func TestLogin_badLogin(t *testing.T) {
 		"pass": {"false"},
 	}
 	called := false
-	testAuthProvider.check_ = func(u, p string) (interface{}, error) {
+	testAuthProvider.checkMock = func(u, p string) (interface{}, error) {
 		called = true
 		return nil, ErrBadLogin
 	}
@@ -58,7 +58,7 @@ func TestLogin_workingLogin(t *testing.T) {
 		"pass": {"testPassw"},
 	}
 	called := false
-	testAuthProvider.check_ = func(u, p string) (interface{}, error) {
+	testAuthProvider.checkMock = func(u, p string) (interface{}, error) {
 		called = true
 		if !(u == "testUser" && p == "testPassw") {
 			return nil, ErrBadLogin
@@ -83,7 +83,7 @@ func TestLogin_workingLoginAndRestrictedAcc(t *testing.T) {
 		"pass": {"testPassw"},
 	}
 	called := false
-	testAuthProvider.check_ = func(u, p string) (interface{}, error) {
+	testAuthProvider.checkMock = func(u, p string) (interface{}, error) {
 		called = true
 		if !(u == "testUser" && p == "testPassw") {
 			return nil, ErrBadLogin
@@ -110,7 +110,7 @@ func TestLogin_workingLoginAndLogout(t *testing.T) {
 		"pass": {"testPassw"},
 	}
 	called := false
-	testAuthProvider.check_ = func(u, p string) (interface{}, error) {
+	testAuthProvider.checkMock = func(u, p string) (interface{}, error) {
 		called = true
 		if !(u == "testUser" && p == "testPassw") {
 			return nil, ErrBadLogin
