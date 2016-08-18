@@ -1,21 +1,17 @@
 package logging
 
 import (
-	"log"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 
-	"github.com/rs/xlog"
+	"github.com/Sirupsen/logrus"
 	"gopkg.in/errgo.v1"
 )
 
-var (
-	conf *xlog.Config
-
-	closeChan chan<- os.Signal
-)
+var closeChan chan<- os.Signal
 
 func SetCloseChan(c chan<- os.Signal) {
 	closeChan = c
@@ -37,65 +33,41 @@ func CheckFatal(err error) {
 			dotName := filepath.Ext(fn.Name())
 			fnName = strings.TrimLeft(dotName, ".") + "()"
 		}
-		xlog.Errorf("%s:%d %s", file, line, fnName)
-		xlog.Error("Fatal Error:", errgo.Details(err))
+		logrus.Errorf("%s:%d %s", file, line, fnName)
+		logrus.Error("Fatal Error:", errgo.Details(err))
 		if closeChan != nil {
-			xlog.Warn("Sending close message")
+			logrus.Warn("Sending close message")
 			closeChan <- os.Interrupt
 		}
 		os.Exit(1)
 	}
 }
 
+var Underlying = logrus.New()
+
 // SetupLogging will initialize the logger backend and set the flags.
-func SetupLogging(c *xlog.Config) {
-	if conf != nil {
-		xlog.Error("logging: initializing twice! skipping...")
-		return
+func SetupLogging(w io.Writer) {
+	if w != nil {
+		Underlying.Out = io.MultiWriter(os.Stderr, w)
 	}
-
-	// defaults
-	if c == nil {
-		c = new(xlog.Config)
-		c.Output = xlog.NewConsoleOutput()
+	if runtime.GOOS == "windows" { // colored ttys are rare on windows...
+		Underlying.Formatter = &logrus.TextFormatter{DisableColors: true}
 	}
-
-	c.Level = xlog.LevelInfo
 	if lvl := os.Getenv("CRYPTIX_LOGLVL"); lvl != "" {
-		var ok bool
-		c.Level, ok = map[string]xlog.Level{
-			"debug": xlog.LevelDebug,
-			"info":  xlog.LevelInfo,
-			"error": xlog.LevelError,
-		}[strings.ToLower(lvl)]
-		if !ok {
-			xlog.Warn("logging: could not match loglvl from env, defaulting to debug")
-			c.Level = xlog.LevelDebug
+		l, err := logrus.ParseLevel(lvl)
+		if err != nil {
+			logrus.Errorf("logging: could not parse lvl from env, defaulting to debug: %s", err)
+			l = logrus.DebugLevel
 		}
+		Underlying.Level = l
 	}
-	conf = c
-	l := xlog.New(*conf)
-	// Plug the xlog handler's input to Go's default logger
-	log.SetFlags(0)
-	log.SetOutput(l)
-
-	xlog.SetLogger(l)
 }
 
 // Logger returns an Entry where the module field is set to name
-func Logger(name string) xlog.Logger {
+func Logger(name string) *logrus.Entry {
 	if name == "" {
-		xlog.Warn("loging: missing name parameter")
+		Underlying.Warn("missing name parameter")
 		name = "undefined"
 	}
-	var thisConf = conf
-	if thisConf == nil {
-		xlog.Warn("logging: not initialized yet.", xlog.F{"name": name})
-		thisConf = &xlog.Config{
-			Output: xlog.NewConsoleOutput(),
-		}
-	}
-	l := xlog.New(*thisConf)
-	l.SetField("unit", name)
-	return l
+	return Underlying.WithField("module", name)
 }

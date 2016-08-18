@@ -1,4 +1,4 @@
-package logging
+package loghttp
 
 import (
 	"net/http"
