@@ -9,11 +9,9 @@ import (
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
-	"golang.org/x/net/context"
 )
 
 func TestRender(t *testing.T) {
-	ctx := context.Background()
 	r, err := New(http.Dir("tests"),
 		AddTemplates("test1.tmpl"),
 	)
@@ -25,7 +23,7 @@ func TestRender(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := r.Render(ctx, rw, req, "test1.tmpl", http.StatusOK, nil); err != nil {
+	if err := r.Render(rw, req, "test1.tmpl", http.StatusOK, nil); err != nil {
 		t.Fatal(err)
 	}
 	if rw.Code != http.StatusOK {
@@ -47,7 +45,6 @@ func TestRender(t *testing.T) {
 }
 
 func TestFuncMap(t *testing.T) {
-	ctx := context.Background()
 	r, err := New(http.Dir("tests"),
 		AddTemplates("testFuncMap.tmpl"),
 		FuncMap(template.FuncMap{
@@ -62,7 +59,7 @@ func TestFuncMap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := r.Render(ctx, rw, req, "testFuncMap.tmpl", http.StatusOK, nil); err != nil {
+	if err := r.Render(rw, req, "testFuncMap.tmpl", http.StatusOK, nil); err != nil {
 		t.Fatal(err)
 	}
 	if rw.Code != http.StatusOK {
@@ -71,7 +68,6 @@ func TestFuncMap(t *testing.T) {
 }
 
 func TestBugOverride(t *testing.T) {
-	ctx := context.Background()
 	r, err := New(http.Dir("tests"),
 		AddTemplates("testFuncMap.tmpl", "bug1.tmpl"),
 		FuncMap(template.FuncMap{"itoa": strconv.Itoa}),
@@ -84,7 +80,7 @@ func TestBugOverride(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := r.Render(ctx, rw, req, "testFuncMap.tmpl", http.StatusOK, nil); err != nil {
+	if err := r.Render(rw, req, "testFuncMap.tmpl", http.StatusOK, nil); err != nil {
 		t.Fatal(err)
 	}
 	if rw.Code != http.StatusOK {
