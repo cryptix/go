@@ -20,7 +20,7 @@ import (
 // if h returns an error it returns http status 500
 type Binary func(resp http.ResponseWriter, req *http.Request) error
 
-func (h Binary) ServeHTTPC(resp http.ResponseWriter, req *http.Request) {
+func (h Binary) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Description", "File Transfer")
 	resp.Header().Set("Content-Transfer-Encoding", "binary")
 	if err := h(resp, req); err != nil {

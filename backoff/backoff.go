@@ -18,7 +18,7 @@ var (
 		[]int{0, 10, 10, 100, 100, 500, 500, 3000, 3000, 5000},
 	}
 
-	Random = RandomPolacy{10 * time.Second}
+	Random = RandomPolicy{10 * time.Second}
 )
 
 // IncreasePolicy implements a backoff policy, randomizing its delays
@@ -48,10 +48,10 @@ func jitter(millis int) int {
 	return millis/2 + rand.Intn(millis)
 }
 
-type RandomPolacy struct {
-	max time.Duration
+type RandomPolicy struct {
+	Max time.Duration
 }
 
-func (b RandomPolacy) Duration(n int) time.Duration {
-	return time.Duration(rand.Int63() % int64(b.max))
+func (b RandomPolicy) Duration(n int) time.Duration {
+	return time.Duration(rand.Int63() % int64(b.Max))
 }
