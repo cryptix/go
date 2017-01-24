@@ -1,13 +1,11 @@
 package logging
 
 import (
+	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"runtime"
-	"strings"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/go-kit/kit/log"
 	"gopkg.in/errgo.v1"
 )
 
@@ -20,54 +18,48 @@ func SetCloseChan(c chan<- os.Signal) {
 // CheckFatal exits the process if err != nil
 func CheckFatal(err error) {
 	if err != nil {
-		pc, file, line, ok := runtime.Caller(1)
-		if !ok {
-			file = "?"
-			line = 0
+		l := Underlying
+		if l == nil {
+			l = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
+			l = log.NewContext(l).With("module", "logging", log.DefaultCaller)
 		}
-		fn := runtime.FuncForPC(pc)
-		var fnName string
-		if fn == nil {
-			fnName = "?()"
-		} else {
-			dotName := filepath.Ext(fn.Name())
-			fnName = strings.TrimLeft(dotName, ".") + "()"
-		}
-		logrus.Errorf("%s:%d %s", file, line, fnName)
-		logrus.Error("Fatal Error:", errgo.Details(err))
+
+		l.Log("check", "fatal", "err", errgo.Details(err))
 		if closeChan != nil {
-			logrus.Warn("Sending close message")
+			l.Log("check", "notice", "msg", "Sending close message")
 			closeChan <- os.Interrupt
 		}
 		os.Exit(1)
 	}
 }
 
-var Underlying = logrus.New()
+var Underlying log.Logger
 
 // SetupLogging will initialize the logger backend and set the flags.
 func SetupLogging(w io.Writer) {
 	if w != nil {
-		Underlying.Out = io.MultiWriter(os.Stderr, w)
+		w = io.MultiWriter(os.Stderr, w)
 	}
-	if runtime.GOOS == "windows" { // colored ttys are rare on windows...
-		Underlying.Formatter = &logrus.TextFormatter{DisableColors: true}
-	}
+	logger := log.NewLogfmtLogger(w)
 	if lvl := os.Getenv("CRYPTIX_LOGLVL"); lvl != "" {
-		l, err := logrus.ParseLevel(lvl)
-		if err != nil {
-			logrus.Errorf("logging: could not parse lvl from env, defaulting to debug: %s", err)
-			l = logrus.DebugLevel
-		}
-		Underlying.Level = l
+		logger.Log("module", "logging", "error", "CRYPTIX_LOGLVL is obsolete. levels are bad, mkay?")
 	}
+	// wrap logger to error-check the writes only once
+	Underlying = log.LoggerFunc(func(keyvals ...interface{}) error {
+		if err := logger.Log(keyvals...); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: logger.Write() failed! %s", err)
+			panic(err) // no other way to escalate this
+		}
+		return nil
+	})
 }
 
 // Logger returns an Entry where the module field is set to name
-func Logger(name string) *logrus.Entry {
+func Logger(name string) *log.Context {
 	if name == "" {
-		Underlying.Warn("missing name parameter")
+		Underlying.Log("module", "logger", "error", "missing name parameter")
 		name = "undefined"
 	}
-	return Underlying.WithField("module", name)
+
+	return log.NewContext(Underlying).With("ts", log.DefaultTimestamp, "caller", log.DefaultCaller, "module", name)
 }
