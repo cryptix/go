@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"path/filepath"
 	"runtime/debug"
 	"sync"
 	"time"
@@ -118,7 +119,7 @@ func (r *Renderer) Render(w http.ResponseWriter, req *http.Request, name string,
 	start := time.Now()
 	l.SetField("tpl", name)
 	buf := r.bufpool.Get()
-	err := t.ExecuteTemplate(buf, r.baseTemplate, data)
+	err := t.ExecuteTemplate(buf, filepath.Base(r.baseTemplate), data)
 	if err != nil {
 		return err
 	}

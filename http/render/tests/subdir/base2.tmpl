@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>{{block "title" .}}Default Title{{end}}</title>
+</head>
+<body>
+  {{block "extra" .}}{{end}}
+  <div class="container">
+    <h1 id="baseHead">Alternative base in a subdir</h1>
+    {{ block "content" . }}{{end}}
+  </div>
+</body>
+</html>
