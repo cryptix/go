@@ -22,7 +22,7 @@ func CheckFatal(err error) {
 		l := internal
 		if l == nil {
 			l = kitlog.NewLogfmtLogger(kitlog.NewSyncWriter(os.Stderr))
-			l = kitlog.NewContext(l).With("module", "logging", kitlog.DefaultCaller)
+			l = kitlog.With(l, "module", "logging", kitlog.DefaultCaller)
 		}
 
 		l.Log("check", "fatal", "err", errgo.Details(err))
@@ -54,20 +54,20 @@ func SetupLogging(w io.Writer) {
 		}
 		return nil
 	})
-	stdlog.SetOutput(kitlog.NewStdlibAdapter(kitlog.NewContext(internal).With("module", "stdlib")))
-	internal = kitlog.NewContext(internal).With("ts", kitlog.DefaultTimestamp, "caller", kitlog.DefaultCaller)
+	stdlog.SetOutput(kitlog.NewStdlibAdapter(kitlog.With(internal, "module", "stdlib")))
+	internal = kitlog.With(internal, "ts", kitlog.DefaultTimestamp, "caller", kitlog.DefaultCaller)
 }
 
 // Logger returns an Entry where the module field is set to name
-func Logger(name string) *kitlog.Context {
+func Logger(name string) kitlog.Logger {
 	l := internal
 	if l == nil {
 		l = kitlog.NewLogfmtLogger(kitlog.NewSyncWriter(os.Stderr))
-		l = kitlog.NewContext(l).With("warning", "uninitizialized", kitlog.DefaultCaller)
+		l = kitlog.With(l, "warning", "uninitizialized", kitlog.DefaultCaller)
 	}
 	if name == "" {
 		l.Log("module", "logger", "error", "missing name parameter")
 		name = "undefined"
 	}
-	return kitlog.NewContext(l).With("module", name)
+	return kitlog.With(l, "module", name)
 }
