@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/oxtoacart/bpool"
+	"github.com/pkg/errors"
 	"github.com/rs/xlog"
 	"github.com/shurcooL/httpfs/html/vfstemplate"
-	"gopkg.in/errgo.v1"
 )
 
 type Renderer struct {
@@ -20,7 +20,7 @@ type Renderer struct {
 
 	// files
 	templateFiles []string
-	baseTemplate  string
+	baseTemplates []string
 
 	funcMap template.FuncMap
 
@@ -43,14 +43,13 @@ func New(fs http.FileSystem, opts ...Option) (*Renderer, error) {
 	}
 	for i, o := range opts {
 		if err := o(r); err != nil {
-			return nil, errgo.Notef(err, "render: option %i failed.", i)
+			return nil, errors.Wrapf(err, "render: option %i failed.", i)
 		}
 	}
 
 	// todo defaults
-
-	if r.baseTemplate == "" {
-		r.baseTemplate = "base.tmpl"
+	if len(r.baseTemplates) == 0 {
+		r.baseTemplates = []string{"base.tmpl"}
 	}
 	return r, r.parseHTMLTemplates()
 }
@@ -60,7 +59,7 @@ func (r *Renderer) GetReloader() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 			if err := r.Reload(); err != nil {
-				err = errgo.Notef(err, "render: could not reload templates")
+				err = errors.Wrapf(err, "render: could not reload templates")
 				r.Error(rw, req, http.StatusInternalServerError, err)
 				return
 			}
@@ -119,7 +118,7 @@ func (r *Renderer) Render(w http.ResponseWriter, req *http.Request, name string,
 	start := time.Now()
 	l.SetField("tpl", name)
 	buf := r.bufpool.Get()
-	err := t.ExecuteTemplate(buf, filepath.Base(r.baseTemplate), data)
+	err := t.ExecuteTemplate(buf, filepath.Base(r.baseTemplates[0]), data)
 	if err != nil {
 		return err
 	}
@@ -144,7 +143,8 @@ func (r *Renderer) Error(w http.ResponseWriter, req *http.Request, status int, e
 		"Err":        err,
 	})
 	if err2 != nil {
-		err = errgo.WithCausef(err, err2, "render: during execution of error template.")
+		err2 = errors.Wrap(err2, "render: during execution of error template")
+		err = errors.Wrap(err, err2.Error())
 		r.logError(req, err, nil)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -154,21 +154,20 @@ func (r *Renderer) parseHTMLTemplates() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.reloading = true
-	var err error
 	funcTpl := template.New("").Funcs(r.funcMap)
 	for _, tf := range r.templateFiles {
 		ftc, err := funcTpl.Clone()
 		if err != nil {
-			return errgo.Notef(err, "render: could not clone func template")
+			return errors.Wrapf(err, "render: could not clone func template")
 		}
-		t, err := vfstemplate.ParseFiles(r.assets, ftc, r.baseTemplate, tf)
+		t, err := vfstemplate.ParseFiles(r.assets, ftc, append(r.baseTemplates, tf)...)
 		if err != nil {
-			return errgo.Notef(err, "render: failed to parse template %s", tf)
+			return errors.Wrapf(err, "render: failed to parse template %s", tf)
 		}
 		r.templates[tf] = t
 	}
 	r.reloading = false
-	return err
+	return nil
 }
 
 func (r *Renderer) logError(req *http.Request, err error, rv interface{}) {

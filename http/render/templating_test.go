@@ -93,7 +93,7 @@ func TestBugOverride(t *testing.T) {
 
 func TestBaseTmpl(t *testing.T) {
 	r, err := New(http.Dir("tests"),
-		BaseTemplate("subdir/base2.tmpl"),
+		BaseTemplates("subdir/base2.tmpl"),
 		AddTemplates("test1.tmpl"),
 		FuncMap(template.FuncMap{"itoa": strconv.Itoa}),
 	)
@@ -117,5 +117,33 @@ func TestBaseTmpl(t *testing.T) {
 	}
 	if heading := doc.Find("#baseHead").Text(); heading != "Alternative base in a subdir" {
 		t.Fatalf("wrong heading. got: %s", heading)
+	}
+}
+
+func TestMultileBaseTmpls(t *testing.T) {
+	r, err := New(http.Dir("tests"),
+		BaseTemplates("subdir/base2.tmpl", "extra.tmpl"),
+		AddTemplates("test2.tmpl"),
+	)
+	if err != nil {
+		t.Fatal("New() failed", err)
+	}
+	rw := httptest.NewRecorder()
+	req, err := http.NewRequest("GET", "/test", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Render(rw, req, "test2.tmpl", http.StatusOK, nil); err != nil {
+		t.Fatal(err)
+	}
+	if rw.Code != http.StatusOK {
+		t.Fatal("wrong status")
+	}
+	doc, err := goquery.NewDocumentFromReader(rw.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ex := doc.Find("#extra").Text(); ex != "additional base tpl" {
+		t.Fatalf("wrong ex. got: %s", ex)
 	}
 }

@@ -12,9 +12,9 @@ func AddTemplates(files ...string) Option {
 	}
 }
 
-func BaseTemplate(base string) Option {
+func BaseTemplates(bases ...string) Option {
 	return func(r *Renderer) error {
-		r.baseTemplate = base
+		r.baseTemplates = bases
 		return nil
 	}
 }
