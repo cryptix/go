@@ -9,11 +9,16 @@ import (
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/cryptix/go/logging"
+	"github.com/cryptix/go/logging/logtest"
 )
 
 func TestRender(t *testing.T) {
+	logging.SetupLogging(logtest.Logger("Rendere", t))
+	log := logging.Logger("TestRender")
 	r, err := New(http.Dir("tests"),
 		AddTemplates("test1.tmpl"),
+		SetLogger(log),
 	)
 	if err != nil {
 		t.Fatal("New() failed", err)
@@ -45,7 +50,10 @@ func TestRender(t *testing.T) {
 }
 
 func TestFuncMap(t *testing.T) {
+	logging.SetupLogging(logtest.Logger("Rendere", t))
+	log := logging.Logger("TestFuncMap")
 	r, err := New(http.Dir("tests"),
+		SetLogger(log),
 		AddTemplates("testFuncMap.tmpl"),
 		FuncMap(template.FuncMap{
 			"itoa": strconv.Itoa,
@@ -68,7 +76,10 @@ func TestFuncMap(t *testing.T) {
 }
 
 func TestBugOverride(t *testing.T) {
+	logging.SetupLogging(logtest.Logger("Rendere", t))
+	log := logging.Logger("TestBugOverride")
 	r, err := New(http.Dir("tests"),
+		SetLogger(log),
 		AddTemplates("testFuncMap.tmpl", "bug1.tmpl"),
 		FuncMap(template.FuncMap{"itoa": strconv.Itoa}),
 	)
@@ -92,7 +103,10 @@ func TestBugOverride(t *testing.T) {
 }
 
 func TestBaseTmpl(t *testing.T) {
+	logging.SetupLogging(logtest.Logger("Rendere", t))
+	log := logging.Logger("TestBugOverride")
 	r, err := New(http.Dir("tests"),
+		SetLogger(log),
 		BaseTemplates("subdir/base2.tmpl"),
 		AddTemplates("test1.tmpl"),
 		FuncMap(template.FuncMap{"itoa": strconv.Itoa}),
@@ -121,7 +135,10 @@ func TestBaseTmpl(t *testing.T) {
 }
 
 func TestMultileBaseTmpls(t *testing.T) {
+	logging.SetupLogging(logtest.Logger("Rendere", t))
+	log := logging.Logger("TestMultileBaseTmpls")
 	r, err := New(http.Dir("tests"),
+		SetLogger(log),
 		BaseTemplates("subdir/base2.tmpl", "extra.tmpl"),
 		AddTemplates("test2.tmpl"),
 	)

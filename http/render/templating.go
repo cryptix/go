@@ -9,14 +9,17 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cryptix/go/logging"
+	"github.com/go-kit/kit/log"
 	"github.com/oxtoacart/bpool"
 	"github.com/pkg/errors"
-	"github.com/rs/xlog"
 	"github.com/shurcooL/httpfs/html/vfstemplate"
 )
 
+// TODO: make interface
 type Renderer struct {
 	assets http.FileSystem
+	log    log.Logger
 
 	// files
 	templateFiles []string
@@ -41,6 +44,7 @@ func New(fs http.FileSystem, opts ...Option) (*Renderer, error) {
 		bufpool:   bpool.NewBufferPool(64),
 		templates: make(map[string]*template.Template),
 	}
+
 	for i, o := range opts {
 		if err := o(r); err != nil {
 			return nil, errors.Wrapf(err, "render: option %i failed.", i)
@@ -48,6 +52,10 @@ func New(fs http.FileSystem, opts ...Option) (*Renderer, error) {
 	}
 
 	// todo defaults
+	if r.log == nil {
+		r.log = logging.Logger("render")
+	}
+
 	if len(r.baseTemplates) == 0 {
 		r.baseTemplates = []string{"base.tmpl"}
 	}
@@ -60,6 +68,7 @@ func (r *Renderer) GetReloader() func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 			if err := r.Reload(); err != nil {
 				err = errors.Wrapf(err, "render: could not reload templates")
+				r.log.Log("event", "error", "msg", "reload failed", "err", err)
 				r.Error(rw, req, http.StatusInternalServerError, err)
 				return
 			}
@@ -87,11 +96,13 @@ func (r *Renderer) HTML(name string, f RenderFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		data, err := f(w, req)
 		if err != nil {
+			r.log.Log("event", "error", "msg", "handler failed", "err", err)
 			r.Error(w, req, http.StatusInternalServerError, err)
 			return
 		}
 		w.Header().Set("Content-Type", "text/html")
 		if err := r.Render(w, req, name, http.StatusOK, data); err != nil {
+			r.log.Log("event", "error", "msg", "HTML render failed", "err", err)
 			r.Error(w, req, http.StatusInternalServerError, err)
 			return
 		}
@@ -102,6 +113,7 @@ func (r *Renderer) StaticHTML(name string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		err := r.Render(w, req, name, http.StatusOK, nil)
 		if err != nil {
+			r.log.Log("event", "error", "msg", "static HTML failed", "err", err)
 			r.Error(w, req, http.StatusInternalServerError, err)
 		}
 	})
@@ -110,27 +122,26 @@ func (r *Renderer) StaticHTML(name string) http.Handler {
 func (r *Renderer) Render(w http.ResponseWriter, req *http.Request, name string, status int, data interface{}) error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	l := xlog.FromContext(req.Context())
 	t, ok := r.templates[name]
 	if !ok {
-		return errgo.New("render: could not find template:" + name)
+		return errors.Errorf("render: could not find template: %s", name)
 	}
 	start := time.Now()
-	l.SetField("tpl", name)
+	l := log.With(r.log, "tpl", name)
 	buf := r.bufpool.Get()
 	err := t.ExecuteTemplate(buf, filepath.Base(r.baseTemplates[0]), data)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "render: template(%s) execution failed.", name)
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
 	_, err = buf.WriteTo(w)
 	r.bufpool.Put(buf)
-	l.Debug("Rendered", xlog.F{
-		"name":   name,
-		"status": status,
-		"took":   time.Since(start),
-	})
+	l.Log("level", "debug", "event", "rendered",
+		"name", name,
+		"status", status,
+		"took", time.Since(start),
+	)
 	return err
 }
 
@@ -178,7 +189,7 @@ func (r *Renderer) logError(req *http.Request, err error, rv interface{}) {
 			fmt.Fprintln(buf, rv)
 			buf.Write(debug.Stack())
 		}
-		xlog.FromContext(req.Context()).Error(buf.String())
+		r.log.Log("event", "error", "msg", "logError", "err", err)
 		r.bufpool.Put(buf)
 	}
 }

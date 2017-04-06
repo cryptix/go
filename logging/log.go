@@ -7,7 +7,6 @@ import (
 	"os"
 
 	kitlog "github.com/go-kit/kit/log"
-	"gopkg.in/errgo.v1"
 )
 
 var closeChan chan<- os.Signal
@@ -24,8 +23,7 @@ func CheckFatal(err error) {
 			l = kitlog.NewLogfmtLogger(kitlog.NewSyncWriter(os.Stderr))
 			l = kitlog.With(l, "module", "logging", kitlog.DefaultCaller)
 		}
-
-		l.Log("check", "fatal", "err", errgo.Details(err))
+		l.Log("check", "fatal", "err", err)
 		if closeChan != nil {
 			l.Log("check", "notice", "msg", "Sending close message")
 			closeChan <- os.Interrupt
@@ -41,7 +39,7 @@ func SetupLogging(w io.Writer) {
 	if w == nil {
 		w = os.Stderr
 	}
-	logger := kitlog.NewLogfmtLogger(w)
+	logger := kitlog.NewLogfmtLogger(kitlog.NewSyncWriter(w))
 
 	if lvl := os.Getenv("CRYPTIX_LOGLVL"); lvl != "" {
 		logger.Log("module", "logging", "error", "CRYPTIX_LOGLVL is obsolete. levels are bad, mkay?")
