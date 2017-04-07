@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"gopkg.in/errgo.v1"
+	"github.com/pkg/errors"
 )
 
 // An ErrorResponse reports errors caused by an API request.
@@ -33,7 +33,7 @@ func CheckResponse(r *http.Response) error {
 	var err error
 	errorResponse.Body, err = ioutil.ReadAll(r.Body)
 	if err != nil {
-		return errgo.Notef(err, "cryptix/http: ReadAll(resp.Body) failed. URL: %s", r.Request.URL.String())
+		return errors.Wrapf(err, "cryptix/http: ReadAll(resp.Body) failed. URL: %s", r.Request.URL.String())
 	}
 
 	return errorResponse

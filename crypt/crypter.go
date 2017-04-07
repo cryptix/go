@@ -6,7 +6,7 @@ import (
 	"crypto/sha512"
 	"io"
 
-	"gopkg.in/errgo.v1"
+	"github.com/pkg/errors"
 )
 
 // Crypter can only be used once
@@ -21,14 +21,14 @@ func NewCrypter(key []byte) (e *Crypter, err error) {
 	e = new(Crypter)
 
 	if len(key) != sha512.Size256 {
-		return nil, errgo.Newf("whatwhat: wrong key length. Got:%d", len(key))
+		return nil, errors.Errorf("whatwhat: wrong key length. Got:%d", len(key))
 	}
 
 	e.key = key
 
 	e.block, err = aes.NewCipher(e.key)
 	if err != nil {
-		return nil, errgo.Notef(err, "whatwhat: couldn't create AES cipher")
+		return nil, errors.Wrap(err, "whatwhat: couldn't create AES cipher")
 	}
 
 	return e, nil
@@ -37,7 +37,7 @@ func NewCrypter(key []byte) (e *Crypter, err error) {
 // MakePipe takes an output (for the cipher text) writer and returns a writer to which you writer your cleartext
 func (e *Crypter) MakePipe(out io.Writer) (io.Writer, error) {
 	if e.used == true {
-		return nil, errgo.Newf("whatwhat: crypter was used twice")
+		return nil, errors.New("whatwhat: crypter was used twice")
 	}
 
 	// we only use Crypter once, its ok to have a zero IV
