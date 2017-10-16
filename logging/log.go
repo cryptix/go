@@ -56,6 +56,8 @@ func SetupLogging(w io.Writer) {
 	internal = kitlog.With(internal, "ts", kitlog.DefaultTimestamp, "caller", kitlog.DefaultCaller)
 }
 
+type Interface kitlog.Logger
+
 // Logger returns an Entry where the module field is set to name
 func Logger(name string) kitlog.Logger {
 	l := internal
