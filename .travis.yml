@@ -1,0 +1,12 @@
+language: go
+
+go:
+  - 1.9
+  - tip
+
+matrix:
+  allow_failures:
+    - go: tip
+
+install:
+  - go get -t -v github.com/cryptix/go/...

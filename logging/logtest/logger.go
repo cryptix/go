@@ -23,7 +23,7 @@ func Logger(prefix string, t *testing.T) io.WriteCloser {
 	return pw
 }
 
-func KitLogger(test string, t *testing.T) log.Logger {
+func KitLogger(test string, t *testing.T) (log.Logger, io.Writer) {
 	pr, pw := io.Pipe()
 	go func() {
 		s := bufio.NewScanner(pr)
@@ -36,5 +36,5 @@ func KitLogger(test string, t *testing.T) log.Logger {
 	}()
 	logger := log.NewLogfmtLogger(log.NewSyncWriter(pw))
 	logger = log.With(logger, "test", test)
-	return logger
+	return logger, pw
 }

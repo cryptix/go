@@ -21,7 +21,7 @@ func CheckFatal(err error) {
 		l := internal
 		if l == nil {
 			l = kitlog.NewLogfmtLogger(kitlog.NewSyncWriter(os.Stderr))
-			l = kitlog.With(l, "module", "logging", kitlog.DefaultCaller)
+			l = kitlog.With(l, "module", "logging", "caller", kitlog.DefaultCaller)
 		}
 		l.Log("check", "fatal", "err", err)
 		if closeChan != nil {
@@ -36,6 +36,10 @@ var internal kitlog.Logger
 
 // SetupLogging will initialize the logger backend and set the flags.
 func SetupLogging(w io.Writer) {
+	if internal != nil {
+		panic("logging already initialized")
+	}
+
 	if w == nil {
 		w = os.Stderr
 	}
@@ -47,14 +51,16 @@ func SetupLogging(w io.Writer) {
 	// wrap logger to error-check the writes only once
 	internal = kitlog.LoggerFunc(func(keyvals ...interface{}) error {
 		if err := logger.Log(keyvals...); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: logger.Write() failed! %s", err)
+			fmt.Fprintf(os.Stderr, "warning: logger.Write() failed! %s - vals: %v", err, keyvals)
 			panic(err) // no other way to escalate this
 		}
 		return nil
 	})
+	internal = kitlog.With(internal, "time", kitlog.DefaultTimestamp, "caller", kitlog.DefaultCaller)
 	stdlog.SetOutput(kitlog.NewStdlibAdapter(kitlog.With(internal, "module", "stdlib")))
-	internal = kitlog.With(internal, "ts", kitlog.DefaultTimestamp, "caller", kitlog.DefaultCaller)
 }
+
+type Interface kitlog.Logger
 
 // Logger returns an Entry where the module field is set to name
 func Logger(name string) kitlog.Logger {
