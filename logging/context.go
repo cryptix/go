@@ -2,6 +2,9 @@ package logging
 
 import (
 	"context"
+	"net/http"
+
+	kitlog "github.com/go-kit/kit/log"
 )
 
 type logctxKeyT string
@@ -15,8 +18,20 @@ func NewContext(ctx context.Context, log Interface) context.Context {
 func FromContext(ctx context.Context) Interface {
 	v, ok := ctx.Value(LogCTXKey).(Interface)
 	if !ok {
-		internal.Log("warning", "no logger inside context")
-		return internal
+		return nil
 	}
 	return v
+}
+
+func InjectHandler(mainLog Interface) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			ctx := req.Context()
+			if l := FromContext(ctx); l == nil {
+				l = kitlog.With(mainLog, "urlPath", req.URL.Path)
+				req = req.WithContext(NewContext(ctx, l))
+			}
+			next.ServeHTTP(w, req)
+		})
+	}
 }
