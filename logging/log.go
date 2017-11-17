@@ -36,14 +36,17 @@ var internal kitlog.Logger
 
 // SetupLogging will initialize the logger backend and set the flags.
 func SetupLogging(w io.Writer) {
-	if internal != nil {
-		panic("logging already initialized")
-	}
 
 	if w == nil {
 		w = os.Stderr
 	}
+
 	logger := kitlog.NewLogfmtLogger(kitlog.NewSyncWriter(w))
+
+	if internal != nil {
+		logger.Log("event", "warning", "msg", "logging inited twice")
+		return
+	}
 
 	if lvl := os.Getenv("CRYPTIX_LOGLVL"); lvl != "" {
 		logger.Log("module", "logging", "error", "CRYPTIX_LOGLVL is obsolete. levels are bad, mkay?")
@@ -51,7 +54,7 @@ func SetupLogging(w io.Writer) {
 	// wrap logger to error-check the writes only once
 	internal = kitlog.LoggerFunc(func(keyvals ...interface{}) error {
 		if err := logger.Log(keyvals...); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: logger.Write() failed! %s - vals: %v", err, keyvals)
+			fmt.Fprintf(w, "warning: logger.Write() failed! %s - vals: %v", err, keyvals)
 			panic(err) // no other way to escalate this
 		}
 		return nil
