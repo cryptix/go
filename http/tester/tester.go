@@ -10,16 +10,19 @@ import (
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/cryptix/go/logging"
+	"github.com/cryptix/go/logging/logtest"
 )
 
 type Tester struct {
-	mux *http.ServeMux
+	mux http.Handler
 	t   *testing.T
 }
 
 func New(mux *http.ServeMux, t *testing.T) *Tester {
+	l, _ := logtest.KitLogger("http/tester", t)
 	return &Tester{
-		mux: mux,
+		mux: logging.InjectHandler(l)(mux),
 		t:   t,
 	}
 }
