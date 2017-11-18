@@ -4,8 +4,6 @@ import (
 	"encoding/hex"
 	"io"
 	"log"
-
-	"github.com/Sirupsen/logrus"
 )
 
 /*
@@ -76,45 +74,4 @@ func (l *readHexLogger) Read(p []byte) (n int, err error) {
 // that it logs to stderr using ecoding/hex.
 func NewReadHexLogger(prefix string, r io.Reader) io.Reader {
 	return &readHexLogger{prefix, r}
-}
-
-// logrus version
-// ==============
-
-type readLogrus struct {
-	e *logrus.Entry
-	r io.Reader
-}
-
-func (l *readLogrus) Read(p []byte) (n int, err error) {
-	n, err = l.r.Read(p)
-	if err != nil {
-		l.e.WithField("read", string(p[0:n])).WithField("err", err).Debug("errored logRead")
-	} else {
-		l.e.WithField("read", string(p[0:n])).Debug("logRead")
-	}
-	return
-}
-
-func NewReadLogrus(e *logrus.Entry, r io.Reader) io.Reader {
-	return &readLogrus{e, r}
-}
-
-type writeLogrus struct {
-	e *logrus.Entry
-	w io.Writer
-}
-
-func (l *writeLogrus) Write(p []byte) (n int, err error) {
-	n, err = l.w.Write(p)
-	if err != nil {
-		l.e.WithField("write", string(p[0:n])).WithField("err", err).Debug("errored logWrite")
-	} else {
-		l.e.WithField("write", string(p[0:n])).Debug("logWrite")
-	}
-	return
-}
-
-func NewWriteLogrus(e *logrus.Entry, w io.Writer) io.Writer {
-	return &writeLogrus{e, w}
 }
