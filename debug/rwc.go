@@ -1,6 +1,10 @@
 package debug
 
-import "io"
+import (
+	"io"
+
+	"github.com/miolini/datacounter"
+)
 
 type RWC struct {
 	io.Reader
@@ -20,5 +24,32 @@ func WrapRWC(c io.ReadWriteCloser) io.ReadWriteCloser {
 }
 
 func (c *RWC) Close() error {
+	return c.c.Close()
+}
+
+type Counter struct {
+	io.Reader
+	io.Writer
+	c io.Closer
+
+	Cr *datacounter.ReaderCounter
+	Cw *datacounter.WriterCounter
+}
+
+func WrapCounter(c io.ReadWriteCloser) *Counter {
+	rc := datacounter.NewReaderCounter(c)
+	wc := datacounter.NewWriterCounter(c)
+
+	return &Counter{
+		Reader: rc,
+		Writer: wc,
+		c:      c,
+
+		Cr: rc,
+		Cw: wc,
+	}
+}
+
+func (c *Counter) Close() error {
 	return c.c.Close()
 }
