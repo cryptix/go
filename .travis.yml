@@ -1,12 +1,14 @@
 language: go
 
 go:
-  - 1.9
-  - tip
+  - "1.x"
+  - "1.9.x"
+  - "1.10.x"
+  - master
 
 matrix:
   allow_failures:
-    - go: tip
+    - go: master
 
 install:
   - go get -t -v github.com/cryptix/go/...
