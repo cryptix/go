@@ -11,6 +11,7 @@ import (
 type StdioConn struct {
 	io.ReadCloser
 	io.WriteCloser
+	waitErr chan error
 }
 
 // Close calls Close on both closers
@@ -21,7 +22,7 @@ func (s StdioConn) Close() error {
 	if err := s.WriteCloser.Close(); err != nil {
 		return err
 	}
-	return nil
+	return <-s.waitErr
 }
 
 func StartStdioProcess(path string, stderr io.Writer, args ...string) (*StdioConn, error) {
@@ -40,6 +41,8 @@ func StartStdioProcess(path string, stderr io.Writer, args ...string) (*StdioCon
 	if err != nil {
 		return nil, err
 	}
+
+	conn.waitErr = make(chan error)
 
 	if stderr == nil {
 		stderr, err := cmd.StderrPipe()
@@ -64,7 +67,9 @@ func StartStdioProcess(path string, stderr io.Writer, args ...string) (*StdioCon
 		return nil, err
 	}
 
-	go cmd.Wait()
+	go func() {
+		conn.waitErr <- cmd.Wait()
+	}()
 
 	return &conn, nil
 }
