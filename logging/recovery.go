@@ -13,30 +13,11 @@ import (
 func RecoveryHandler() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			var err error
 			defer func() {
 				if r := recover(); r != nil {
-					l := FromContext(req.Context())
-					switch t := r.(type) {
-					case string:
-						err = errors.New(t)
-					case error:
-						err = t
-					default:
-						err = errors.Errorf("unkown error: %v", r)
-					}
-					os.Mkdir("panics", os.ModePerm)
-					b, tmpErr := ioutil.TempFile("panics", "httpRecovery")
-					if tmpErr != nil {
-						panic(errors.Wrap(tmpErr, "failed to create httpRecovery log"))
-					}
-					fmt.Fprintf(b, "warning! httpRecovery!\nError: %s\n", err)
-					fmt.Fprintf(b, "Stack:\n%s", debug.Stack())
-
-					l.Log("event", "httpPanic", "panicLog", b.Name())
-
-					if err := b.Close(); err != nil {
-						panic(errors.Wrap(err, "failed to close httpRecovery log"))
+					if err := LogPanicWithStack(FromContext(req.Context()), "httpRecovery", r); err != nil {
+						fmt.Fprintf(os.Stderr, "PanicLog failed! %q", err)
+						panic(err)
 					}
 					http.Error(w, "internal processing error - please try again", http.StatusInternalServerError)
 				}
@@ -44,4 +25,29 @@ func RecoveryHandler() func(http.Handler) http.Handler {
 			next.ServeHTTP(w, req)
 		})
 	}
+}
+
+func LogPanicWithStack(log Interface, location string, r interface{}) error {
+	var err error
+	switch t := r.(type) {
+	case string:
+		err = errors.New(t)
+	case error:
+		err = t
+	default:
+		err = errors.Errorf("unkown type(%T) error: %v", r, r)
+	}
+	os.Mkdir("panics", os.ModePerm)
+	b, tmpErr := ioutil.TempFile("panics", location)
+	if tmpErr != nil {
+		log.Log("event", "panic", "location", location, "err", err, "warning", "no temp file", "tmperr", tmpErr)
+		return errors.Wrapf(tmpErr, "LogPanic: failed to create httpRecovery log")
+	}
+
+	fmt.Fprintf(b, "warning! %s!\nError: %s\n", location, err)
+	fmt.Fprintf(b, "Stack:\n%s", debug.Stack())
+
+	log.Log("event", "panic", "location", location, "panicLog", b.Name())
+
+	return errors.Wrap(b.Close(), "LogPanic: failed to close dump file")
 }
