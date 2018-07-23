@@ -11,6 +11,7 @@ import (
 
 var closeChan chan<- os.Signal
 
+// SetCloseChan sets a signal channel that is sent to when CheckFatal is used
 func SetCloseChan(c chan<- os.Signal) {
 	closeChan = c
 }
@@ -63,6 +64,7 @@ func SetupLogging(w io.Writer) {
 	stdlog.SetOutput(kitlog.NewStdlibAdapter(kitlog.With(internal, "module", "stdlib")))
 }
 
+// Interface renames the (go-kit/log).Logger interface for conveninence
 type Interface kitlog.Logger
 
 // Logger returns an Entry where the module field is set to name

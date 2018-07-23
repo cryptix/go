@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// RecoveryHandler recovers handler panics and logs them using LogPanicWithStack
 func RecoveryHandler() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -27,6 +28,7 @@ func RecoveryHandler() func(http.Handler) http.Handler {
 	}
 }
 
+// LogPanicWithStack writes the passed value r, together with a debug.Stack to a tmpfile and logs its location
 func LogPanicWithStack(log Interface, location string, r interface{}) error {
 	var err error
 	switch t := r.(type) {

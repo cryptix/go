@@ -7,6 +7,7 @@ import (
 	kitlog "github.com/go-kit/kit/log"
 )
 
+// Writer returns a writer which logs each line that is written to it using a bufio.Scanner
 func Writer(unit string, l kitlog.Logger) io.WriteCloser {
 	l = kitlog.With(l, "unit", unit)
 	pr, pw := io.Pipe()
