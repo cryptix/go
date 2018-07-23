@@ -7,6 +7,7 @@ import (
 	"os"
 
 	kitlog "github.com/go-kit/kit/log"
+	"github.com/pkg/errors"
 )
 
 var closeChan chan<- os.Signal
@@ -25,6 +26,9 @@ func CheckFatal(err error) {
 			l = kitlog.With(l, "module", "logging", "caller", kitlog.DefaultCaller)
 		}
 		l.Log("check", "fatal", "err", err)
+		if err := LogPanicWithStack(l, "CheckFatal", err); err != nil {
+			panic(errors.Wrap(err, "CheckFatal could not dump error"))
+		}
 		if closeChan != nil {
 			l.Log("check", "notice", "msg", "Sending close message")
 			closeChan <- os.Interrupt

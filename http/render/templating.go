@@ -47,7 +47,7 @@ func New(fs http.FileSystem, opts ...Option) (*Renderer, error) {
 
 	for i, o := range opts {
 		if err := o(r); err != nil {
-			return nil, errors.Wrapf(err, "render: option %i failed.", i)
+			return nil, errors.Wrapf(err, "render: option %d failed.", i)
 		}
 	}
 
