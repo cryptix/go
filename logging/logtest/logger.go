@@ -23,7 +23,7 @@ func Logger(prefix string, t *testing.T) io.WriteCloser {
 	return pw
 }
 
-func KitLogger(test string, t *testing.T) (log.Logger, io.Writer) {
+func KitLogger(test string, t testing.TB) (log.Logger, io.Writer) {
 	pr, pw := io.Pipe()
 	go func() {
 		s := bufio.NewScanner(pr)
