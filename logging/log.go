@@ -3,7 +3,6 @@ package logging
 import (
 	"fmt"
 	"io"
-	stdlog "log"
 	"os"
 
 	kitlog "github.com/go-kit/kit/log"
@@ -20,14 +19,12 @@ func SetCloseChan(c chan<- os.Signal) {
 // CheckFatal exits the process if err != nil
 func CheckFatal(err error) {
 	if err != nil {
-		l := internal
-		if l == nil {
-			l = kitlog.NewLogfmtLogger(kitlog.NewSyncWriter(os.Stderr))
-			l = kitlog.With(l, "module", "logging", "caller", kitlog.DefaultCaller)
-		}
+		l := kitlog.NewLogfmtLogger(kitlog.NewSyncWriter(os.Stderr))
+		l = kitlog.With(l, "module", "logging", "caller", kitlog.DefaultCaller)
 		l.Log("check", "fatal", "err", err)
-		if err := LogPanicWithStack(l, "CheckFatal", err); err != nil {
-			panic(errors.Wrap(err, "CheckFatal could not dump error"))
+		if e2 := LogPanicWithStack(l, "CheckFatal", err); e2 != nil {
+			fmt.Fprintf(os.Stderr, "CheckFatal Error:\n%#v", err)
+			panic(errors.Wrap(e2, "CheckFatal could not dump error"))
 		}
 		if closeChan != nil {
 			l.Log("check", "notice", "msg", "Sending close message")
@@ -37,50 +34,50 @@ func CheckFatal(err error) {
 	}
 }
 
-var internal kitlog.Logger
+type Interface interface {
+	kitlog.Logger
+}
 
-// SetupLogging will initialize the logger backend and set the flags.
-func SetupLogging(w io.Writer) {
+type InfoLog struct {
+	Interface
+}
+
+// NewDevelopment gives you a new information logging helper
+func NewDevelopment(w io.Writer, opts ...Option) (*InfoLog, error) {
+	var il InfoLog
 
 	if w == nil {
 		w = os.Stderr
+		//? w = ioutil.Discard
 	}
 
 	logger := kitlog.NewLogfmtLogger(kitlog.NewSyncWriter(w))
 
-	if internal != nil {
-		logger.Log("event", "warning", "msg", "logging inited twice")
-		return
-	}
-
-	if lvl := os.Getenv("CRYPTIX_LOGLVL"); lvl != "" {
-		logger.Log("module", "logging", "error", "CRYPTIX_LOGLVL is obsolete. levels are bad, mkay?")
-	}
 	// wrap logger to error-check the writes only once
-	internal = kitlog.LoggerFunc(func(keyvals ...interface{}) error {
+	il.Interface = kitlog.LoggerFunc(func(keyvals ...interface{}) error {
 		if err := logger.Log(keyvals...); err != nil {
 			fmt.Fprintf(w, "warning: logger.Write() failed! %s - vals: %v", err, keyvals)
+			closeChan <- os.Interrupt
 			panic(err) // no other way to escalate this
 		}
 		return nil
 	})
-	internal = kitlog.With(internal, "time", kitlog.DefaultTimestamp, "caller", kitlog.DefaultCaller)
-	stdlog.SetOutput(kitlog.NewStdlibAdapter(kitlog.With(internal, "module", "stdlib")))
+
+	for i, o := range opts {
+		err := o(&il)
+		if err != nil {
+			return nil, errors.Wrapf(err, "logging: NewDevelopment option %d failed", i)
+		}
+	}
+
+	return &il, nil
 }
 
-// Interface renames the (go-kit/log).Logger interface for conveninence
-type Interface kitlog.Logger
-
 // Logger returns an Entry where the module field is set to name
-func Logger(name string) kitlog.Logger {
-	l := internal
-	if l == nil {
-		l = kitlog.NewLogfmtLogger(kitlog.NewSyncWriter(os.Stderr))
-		l = kitlog.With(l, "warning", "uninitizialized", kitlog.DefaultCaller)
-	}
+func (il InfoLog) Module(name string) Interface {
 	if name == "" {
-		l.Log("module", "logger", "error", "missing name parameter")
+		il.Log("module", "logger", "error", "missing name parameter")
 		name = "undefined"
 	}
-	return kitlog.With(l, "module", name)
+	return kitlog.With(il, "module", name)
 }
