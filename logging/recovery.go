@@ -7,6 +7,7 @@ import (
 	"os"
 	"runtime/debug"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 )
 
@@ -16,7 +17,11 @@ func RecoveryHandler() func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			defer func() {
 				if r := recover(); r != nil {
-					if err := LogPanicWithStack(FromContext(req.Context()), "httpRecovery", r); err != nil {
+					log := FromContext(req.Context())
+					if log == nil {
+						log = Logger("RecoveryHandler")
+					}
+					if err := LogPanicWithStack(log, "httpRecovery", r); err != nil {
 						fmt.Fprintf(os.Stderr, "PanicLog failed! %q", err)
 						panic(err)
 					}
@@ -29,7 +34,10 @@ func RecoveryHandler() func(http.Handler) http.Handler {
 }
 
 // LogPanicWithStack writes the passed value r, together with a debug.Stack to a tmpfile and logs its location
-func LogPanicWithStack(log Interface, location string, r interface{}) error {
+func LogPanicWithStack(log Interface, location string, r interface{}, vals ...interface{}) error {
+	if log == nil {
+		log = internal
+	}
 	var err error
 	switch t := r.(type) {
 	case string:
@@ -45,7 +53,11 @@ func LogPanicWithStack(log Interface, location string, r interface{}) error {
 		log.Log("event", "panic", "location", location, "err", err, "warning", "no temp file", "tmperr", tmpErr)
 		return errors.Wrapf(tmpErr, "LogPanic: failed to create httpRecovery log")
 	}
+
 	fmt.Fprintf(b, "warning! %s!\nError:\n%+v\n", location, err)
+	for i, v := range vals {
+		spew.Fdump(b, "val(%d): %#v\n", i, v)
+	}
 	fmt.Fprintf(b, "\n\nCall Stack:\n%s", debug.Stack())
 
 	log.Log("event", "panic", "location", location, "panicLog", b.Name())
