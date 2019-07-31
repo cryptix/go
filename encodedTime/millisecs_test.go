@@ -2,12 +2,11 @@ package encodedTime
 
 import (
 	"bytes"
-	"fmt"
-	"time"
 	"encoding/json"
+	"fmt"
 	"testing"
+	"time"
 )
-
 
 func TestMillisecsUnmarshall(t *testing.T) {
 
@@ -20,11 +19,10 @@ func TestMillisecsUnmarshall(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if n:=time.Time(v.Timestamp).Sub(time.Unix(1449808143436/1000, 0));n != 0 {
-		t.Fatal(fmt.Errorf("times not equal:%d",n))
+	if n := time.Time(v.Timestamp).Sub(time.Unix(1449808143436/1000, 0)); n != 0 {
+		t.Fatal(fmt.Errorf("times not equal:%d", n))
 	}
 }
-
 
 // SSBQuirk
 func TestFloats(t *testing.T) {
@@ -32,14 +30,14 @@ func TestFloats(t *testing.T) {
 	v := struct {
 		Timestamp Millisecs
 	}{}
-	
+
 	err := json.Unmarshal([]byte(`{"Timestamp":1553708494043.0059}`), &v)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if n:=time.Time(v.Timestamp).Sub(time.Unix(15537084940430059/1000, 0));n != 0 {
-		t.Fatal(fmt.Errorf("times not equal:%d",n))
+	if n := time.Time(v.Timestamp).Sub(time.Unix(15537084940430059/1000, 0)); n != 0 {
+		t.Fatal(fmt.Errorf("times not equal:%d", n))
 	}
 }
 

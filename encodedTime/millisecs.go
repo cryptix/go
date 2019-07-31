@@ -1,12 +1,11 @@
 package encodedTime
 
 import (
-	"math"
 	"bytes"
+	"math"
 	"strconv"
 	"time"
 )
-
 
 // Millisecs is used to get a time from an js number that represents a timestamp in milliseconds
 type Millisecs time.Time
@@ -17,13 +16,13 @@ func NewMillisecs(secs int64) Millisecs {
 }
 
 func (t *Millisecs) UnmarshalJSON(in []byte) (err error) {
-	dot:= []byte{'.'}
-	i := bytes.Index(in,dot)
+	dot := []byte{'.'}
+	i := bytes.Index(in, dot)
 	if i == -1 {
 		i = 1000
 	} else {
-		i = int(math.Pow(10, float64(len(in) - i-2)))
-		in = bytes.Replace(in, dot, []byte{},1)
+		i = int(math.Pow(10, float64(len(in)-i-2)))
+		in = bytes.Replace(in, dot, []byte{}, 1)
 	}
 	secs, err := strconv.ParseInt(string(in), 10, 64)
 	if err != nil {
