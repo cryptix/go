@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"go.mindeco.de/toolbelt/http/tester"
+	"go.mindeco.de/http/tester"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
 )

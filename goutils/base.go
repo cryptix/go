@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"go.mindeco.de/toolbelt/logging"
+	"go.mindeco.de/logging"
 	"github.com/pkg/errors"
 )
 

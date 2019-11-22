@@ -1,4 +1,4 @@
-module go.mindeco.de/toolbelt
+module go.mindeco.de
 
 require (
 	github.com/PuerkitoBio/goquery v1.5.0

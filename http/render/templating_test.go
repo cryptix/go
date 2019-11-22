@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
-	"go.mindeco.de/toolbelt/logging"
-	"go.mindeco.de/toolbelt/logging/logtest"
+	"go.mindeco.de/logging"
+	"go.mindeco.de/logging/logtest"
 )
 
 func TestRender(t *testing.T) {

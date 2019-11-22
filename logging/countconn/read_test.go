@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"go.mindeco.de/toolbelt/logging/countconn"
+	"go.mindeco.de/logging/countconn"
 )
 
 func ExampleNewReader() {
