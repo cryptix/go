@@ -1,4 +1,4 @@
-module github.com/cryptix/go
+module go.mindeco.de/toolbelt
 
 require (
 	github.com/PuerkitoBio/goquery v1.5.0
@@ -15,3 +15,5 @@ require (
 	github.com/shurcooL/httpfs v0.0.0-20190527155220-6a4d4a70508b
 	github.com/stretchr/testify v1.3.0
 )
+
+go 1.13

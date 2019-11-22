@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cryptix/go/logging"
+	"go.mindeco.de/toolbelt/logging"
 	"github.com/go-kit/kit/log"
 	"github.com/oxtoacart/bpool"
 	"github.com/pkg/errors"

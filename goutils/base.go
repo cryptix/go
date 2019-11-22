@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cryptix/go/logging"
+	"go.mindeco.de/toolbelt/logging"
 	"github.com/pkg/errors"
 )
 

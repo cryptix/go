@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/cryptix/go/logging/countconn"
+	"go.mindeco.de/toolbelt/logging/countconn"
 )
 
 func ExampleNewReader() {

@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/cryptix/go/logging"
-	"github.com/cryptix/go/logging/logtest"
+	"go.mindeco.de/toolbelt/logging"
+	"go.mindeco.de/toolbelt/logging/logtest"
 )
 
 type Tester struct {

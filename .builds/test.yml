@@ -1,0 +1,9 @@
+image: alpine/latest
+packages:
+  - go
+sources:
+  - https://git.sr.ht/~cryptix/go-toolbelt
+tasks:
+  - test: |
+      cd go-toolbelt
+      go test
