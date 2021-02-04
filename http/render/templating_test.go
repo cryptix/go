@@ -164,3 +164,40 @@ func TestMultileBaseTmpls(t *testing.T) {
 		t.Fatalf("wrong ex. got: %s", ex)
 	}
 }
+
+func TestFuncInjection(t *testing.T) {
+	logging.SetupLogging(logtest.Logger("Render", t))
+	log := logging.Logger("TestFuncMap")
+	r, err := New(http.Dir("tests"),
+		SetLogger(log),
+		AddTemplates("testInject.tmpl"),
+		InjectTemplateFunc("addr", func(r *http.Request) interface{} {
+			return func() string {
+				return r.Header.Get("X-Test-Addr")
+			}
+		}),
+	)
+	if err != nil {
+		t.Fatal("New() failed", err)
+	}
+	rw := httptest.NewRecorder()
+	req, err := http.NewRequest("GET", "/test", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("X-Test-Addr", "localhost:1234")
+
+	if err := r.Render(rw, req, "testInject.tmpl", http.StatusOK, nil); err != nil {
+		t.Fatal(err)
+	}
+	if rw.Code != http.StatusOK {
+		t.Fatal("wrong status")
+	}
+	doc, err := goquery.NewDocumentFromReader(rw.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ex := doc.Find("#addr").Text(); ex != "localhost:1234" {
+		t.Fatalf("wrong ex. got: %s", ex)
+	}
+}

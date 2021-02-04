@@ -16,7 +16,6 @@ import (
 	"github.com/shurcooL/httpfs/html/vfstemplate"
 )
 
-// TODO: make interface
 type Renderer struct {
 	assets http.FileSystem
 	log    log.Logger
@@ -26,6 +25,8 @@ type Renderer struct {
 	baseTemplates []string
 
 	funcMap template.FuncMap
+
+	tplFuncInjectors map[string]FuncInjector
 
 	// bufpool is shared between all render() calls
 	bufpool *bpool.BufferPool
@@ -43,6 +44,8 @@ func New(fs http.FileSystem, opts ...Option) (*Renderer, error) {
 		assets:    fs,
 		bufpool:   bpool.NewBufferPool(64),
 		templates: make(map[string]*template.Template),
+
+		tplFuncInjectors: make(map[string]FuncInjector),
 	}
 
 	for i, o := range opts {
@@ -122,14 +125,32 @@ func (r *Renderer) StaticHTML(name string) http.Handler {
 func (r *Renderer) Render(w http.ResponseWriter, req *http.Request, name string, status int, data interface{}) error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+
 	t, ok := r.templates[name]
 	if !ok {
-		return errors.Errorf("render: could not find template: %s", name)
+		return fmt.Errorf("render: could not find template: %s", name)
 	}
+
+	// create request scoped functions
+	var scopedFuncs = make(template.FuncMap, len(r.tplFuncInjectors))
+	for name, fn := range r.tplFuncInjectors {
+		scopedFuncs[name] = fn(req)
+	}
+
+	// need to clone the template to not bork it for future requests
+	scopedTpl, err := t.Clone()
+	if err != nil {
+		return err
+	}
+
+	// assign the scoped functions
+	scopedTpl = scopedTpl.Funcs(scopedFuncs)
+
 	start := time.Now()
 	l := log.With(r.log, "tpl", name)
 	buf := r.bufpool.Get()
-	err := t.ExecuteTemplate(buf, filepath.Base(r.baseTemplates[0]), data)
+
+	err = scopedTpl.ExecuteTemplate(buf, filepath.Base(r.baseTemplates[0]), data)
 	if err != nil {
 		return errors.Wrapf(err, "render: template(%s) execution failed.", name)
 	}
@@ -165,7 +186,20 @@ func (r *Renderer) parseHTMLTemplates() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.reloading = true
-	funcTpl := template.New("").Funcs(r.funcMap)
+
+	parseFuncs := make(template.FuncMap, len(r.funcMap)+len(r.tplFuncInjectors))
+	for k, v := range r.funcMap {
+		parseFuncs[k] = v
+	}
+
+	// these are just placeholders so that the functions are not undefined.
+	// they are repaced in Render() after the template is cloned.
+	for k, _ := range r.tplFuncInjectors {
+		parseFuncs[k] = func(...interface{}) string { return k }
+	}
+
+	funcTpl := template.New("").Funcs(parseFuncs)
+
 	for _, tf := range r.templateFiles {
 		ftc, err := funcTpl.Clone()
 		if err != nil {

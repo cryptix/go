@@ -1,7 +1,9 @@
 package render
 
 import (
+	"fmt"
 	"html/template"
+	"net/http"
 
 	"github.com/go-kit/kit/log"
 	"github.com/pkg/errors"
@@ -30,6 +32,18 @@ func BaseTemplates(bases ...string) Option {
 func FuncMap(m template.FuncMap) Option {
 	return func(r *Renderer) error {
 		r.funcMap = m
+		return nil
+	}
+}
+
+type FuncInjector func(*http.Request) interface{}
+
+func InjectTemplateFunc(name string, fn FuncInjector) Option {
+	return func(r *Renderer) error {
+		if _, has := r.tplFuncInjectors[name]; has {
+			return fmt.Errorf("injection %s name already taken", name)
+		}
+		r.tplFuncInjectors[name] = fn
 		return nil
 	}
 }
