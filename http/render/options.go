@@ -1,12 +1,12 @@
 package render
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
 
 	"github.com/go-kit/kit/log"
-	"github.com/pkg/errors"
 )
 
 type Option func(*Renderer) error
@@ -15,7 +15,7 @@ type Option func(*Renderer) error
 func AddTemplates(files ...string) Option {
 	return func(r *Renderer) error {
 		if len(files) == 0 {
-			return errors.New("render: no templates passed")
+			return fmt.Errorf("render: no templates passed")
 		}
 		r.templateFiles = files
 		return nil

@@ -9,10 +9,9 @@ Both wrap a http.HandlerFunc-like function with an error return value and argume
 package render
 
 import (
+	"fmt"
 	"log"
 	"net/http"
-
-	"github.com/pkg/errors"
 )
 
 // Binary sets Content-Description and Content-Transfer-Encoding
@@ -23,7 +22,7 @@ func (h Binary) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Description", "File Transfer")
 	resp.Header().Set("Content-Transfer-Encoding", "binary")
 	if err := h(resp, req); err != nil {
-		err = errors.Wrapf(err, "render/binary: handler error serving %s", req.URL)
+		err = fmt.Errorf("render/binary: handler error serving %s: %w", req.URL, err)
 		// TOODO: request injection
 		log.Println("Binary/ServeHTTP:", err)
 		http.Error(resp, err.Error(), http.StatusInternalServerError)

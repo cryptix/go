@@ -14,7 +14,7 @@ import (
 )
 
 func TestRender(t *testing.T) {
-	logging.SetupLogging(logtest.Logger("Rendere", t))
+	logging.SetupLogging(logtest.Logger("Render", t))
 	log := logging.Logger("TestRender")
 	r, err := New(http.Dir("tests"),
 		AddTemplates("test1.tmpl"),
@@ -50,7 +50,7 @@ func TestRender(t *testing.T) {
 }
 
 func TestFuncMap(t *testing.T) {
-	logging.SetupLogging(logtest.Logger("Rendere", t))
+	logging.SetupLogging(logtest.Logger("Render", t))
 	log := logging.Logger("TestFuncMap")
 	r, err := New(http.Dir("tests"),
 		SetLogger(log),
@@ -76,7 +76,7 @@ func TestFuncMap(t *testing.T) {
 }
 
 func TestBugOverride(t *testing.T) {
-	logging.SetupLogging(logtest.Logger("Rendere", t))
+	logging.SetupLogging(logtest.Logger("Render", t))
 	log := logging.Logger("TestBugOverride")
 	r, err := New(http.Dir("tests"),
 		SetLogger(log),
@@ -103,7 +103,7 @@ func TestBugOverride(t *testing.T) {
 }
 
 func TestBaseTmpl(t *testing.T) {
-	logging.SetupLogging(logtest.Logger("Rendere", t))
+	logging.SetupLogging(logtest.Logger("Render", t))
 	log := logging.Logger("TestBugOverride")
 	r, err := New(http.Dir("tests"),
 		SetLogger(log),
@@ -135,7 +135,7 @@ func TestBaseTmpl(t *testing.T) {
 }
 
 func TestMultileBaseTmpls(t *testing.T) {
-	logging.SetupLogging(logtest.Logger("Rendere", t))
+	logging.SetupLogging(logtest.Logger("Render", t))
 	log := logging.Logger("TestMultileBaseTmpls")
 	r, err := New(http.Dir("tests"),
 		SetLogger(log),

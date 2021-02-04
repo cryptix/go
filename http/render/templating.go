@@ -9,11 +9,11 @@ import (
 	"sync"
 	"time"
 
-	"go.mindeco.de/logging"
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/oxtoacart/bpool"
-	"github.com/pkg/errors"
 	"github.com/shurcooL/httpfs/html/vfstemplate"
+	"go.mindeco.de/logging"
 )
 
 type Renderer struct {
@@ -50,7 +50,7 @@ func New(fs http.FileSystem, opts ...Option) (*Renderer, error) {
 
 	for i, o := range opts {
 		if err := o(r); err != nil {
-			return nil, errors.Wrapf(err, "render: option %d failed.", i)
+			return nil, fmt.Errorf("render: option %d failed: %w", i, err)
 		}
 	}
 
@@ -70,8 +70,8 @@ func (r *Renderer) GetReloader() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 			if err := r.Reload(); err != nil {
-				err = errors.Wrapf(err, "render: could not reload templates")
-				r.log.Log("event", "error", "msg", "reload failed", "err", err)
+				level.Error(r.log).Log("event", "reload failed", "err", err)
+				err = fmt.Errorf("render: could not reload templates: %w", err)
 				r.Error(rw, req, http.StatusInternalServerError, err)
 				return
 			}
@@ -99,13 +99,13 @@ func (r *Renderer) HTML(name string, f RenderFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		data, err := f(w, req)
 		if err != nil {
-			r.log.Log("event", "error", "msg", "handler failed", "err", err)
+			level.Error(r.log).Log("event", "handler failed", "err", err)
 			r.Error(w, req, http.StatusInternalServerError, err)
 			return
 		}
 		w.Header().Set("Content-Type", "text/html")
 		if err := r.Render(w, req, name, http.StatusOK, data); err != nil {
-			r.log.Log("event", "error", "msg", "HTML render failed", "err", err)
+			level.Error(r.log).Log("event", "HTML render failed", "err", err)
 			r.Error(w, req, http.StatusInternalServerError, err)
 			return
 		}
@@ -116,7 +116,7 @@ func (r *Renderer) StaticHTML(name string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		err := r.Render(w, req, name, http.StatusOK, nil)
 		if err != nil {
-			r.log.Log("event", "error", "msg", "static HTML failed", "err", err)
+			level.Error(r.log).Log("msg", "static HTML failed", "err", err)
 			r.Error(w, req, http.StatusInternalServerError, err)
 		}
 	})
@@ -152,16 +152,20 @@ func (r *Renderer) Render(w http.ResponseWriter, req *http.Request, name string,
 
 	err = scopedTpl.ExecuteTemplate(buf, filepath.Base(r.baseTemplates[0]), data)
 	if err != nil {
-		return errors.Wrapf(err, "render: template(%s) execution failed.", name)
+		return fmt.Errorf("render: template(%s) execution failed: %w", name, err)
 	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
+	sz := buf.Len()
 	_, err = buf.WriteTo(w)
+
 	r.bufpool.Put(buf)
-	l.Log("level", "debug", "event", "rendered",
+	level.Debug(l).Log("event", "rendered",
 		"name", name,
 		"status", status,
 		"took", time.Since(start),
+		"size", sz,
 	)
 	return err
 }
@@ -175,8 +179,8 @@ func (r *Renderer) Error(w http.ResponseWriter, req *http.Request, status int, e
 		"Err":        err,
 	})
 	if err2 != nil {
-		err2 = errors.Wrap(err2, "render: during execution of error template")
-		err = errors.Wrap(err, err2.Error())
+		err2 = fmt.Errorf("render: during execution of error template: %w", err2)
+		err = fmt.Errorf("meant to return %s but ran into %w", err, err2)
 		r.logError(req, err, nil)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -203,11 +207,11 @@ func (r *Renderer) parseHTMLTemplates() error {
 	for _, tf := range r.templateFiles {
 		ftc, err := funcTpl.Clone()
 		if err != nil {
-			return errors.Wrapf(err, "render: could not clone func template")
+			return fmt.Errorf("render: could not clone func template: %w", err)
 		}
 		t, err := vfstemplate.ParseFiles(r.assets, ftc, append(r.baseTemplates, tf)...)
 		if err != nil {
-			return errors.Wrapf(err, "render: failed to parse template %s", tf)
+			return fmt.Errorf("render: failed to parse template %s: %w", tf, err)
 		}
 		r.templates[tf] = t
 	}
@@ -223,7 +227,7 @@ func (r *Renderer) logError(req *http.Request, err error, rv interface{}) {
 			fmt.Fprintln(buf, rv)
 			buf.Write(debug.Stack())
 		}
-		r.log.Log("event", "error", "msg", "logError", "err", err)
+		level.Error(r.log).Log("event", "logError", "err", err)
 		r.bufpool.Put(buf)
 	}
 }
