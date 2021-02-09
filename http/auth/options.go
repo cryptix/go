@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"net/http"
 	"time"
 
 	"github.com/gorilla/sessions"
@@ -59,6 +60,13 @@ func SetLogout(l string) Option {
 func SetLifetime(d time.Duration) Option {
 	return func(h *Handler) error {
 		h.lifetime = d
+		return nil
+	}
+}
+
+func SetNotAuthorizedHandler(nah http.Handler) Option {
+	return func(h *Handler) error {
+		h.notAuthorizedHandler = nah
 		return nil
 	}
 }

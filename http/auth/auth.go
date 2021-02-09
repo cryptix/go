@@ -42,6 +42,8 @@ type Handler struct {
 	auther Auther
 	store  sessions.Store
 
+	notAuthorizedHandler http.Handler
+
 	redirLanding string // the url to redirect to after login
 	redirLogout  string // the url to redirect to after logout
 
@@ -81,6 +83,12 @@ func NewHandler(a Auther, options ...Option) (*Handler, error) {
 
 	if ah.sessionName == "" {
 		ah.sessionName = defaultSessionName
+	}
+
+	if ah.notAuthorizedHandler == nil {
+		ah.notAuthorizedHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "Not Authorized", http.StatusUnauthorized)
+		})
 	}
 
 	return &ah, nil
@@ -124,7 +132,7 @@ func (ah Handler) Authorize(w http.ResponseWriter, r *http.Request) {
 func (ah Handler) Authenticate(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, err := ah.AuthenticateRequest(r); err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+			ah.notAuthorizedHandler.ServeHTTP(w, r)
 			return
 		}
 
