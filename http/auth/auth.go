@@ -42,6 +42,7 @@ type Handler struct {
 	auther Auther
 	store  sessions.Store
 
+	errorHandler         ErrorHandler
 	notAuthorizedHandler http.Handler
 
 	redirLanding string // the url to redirect to after login
@@ -85,9 +86,15 @@ func NewHandler(a Auther, options ...Option) (*Handler, error) {
 		ah.sessionName = defaultSessionName
 	}
 
+	if ah.errorHandler == nil {
+		ah.errorHandler = func(w http.ResponseWriter, r *http.Request, err error, code int) {
+			http.Error(w, err.Error(), code)
+		}
+	}
+
 	if ah.notAuthorizedHandler == nil {
 		ah.notAuthorizedHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			http.Error(w, "Not Authorized", http.StatusUnauthorized)
+			ah.errorHandler(w, r, ErrNotAuthorized, http.StatusUnauthorized)
 		})
 	}
 
@@ -97,31 +104,35 @@ func NewHandler(a Auther, options ...Option) (*Handler, error) {
 func (ah Handler) Authorize(w http.ResponseWriter, r *http.Request) {
 	session, err := ah.store.Get(r, ah.sessionName)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ah.errorHandler(w, r, err, http.StatusInternalServerError)
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ah.errorHandler(w, r, err, http.StatusInternalServerError)
 		return
 	}
 
 	user := r.Form.Get("user")
 	pass := r.Form.Get("pass")
 	if user == "" || pass == "" {
-		http.Error(w, ErrBadLogin.Error(), http.StatusBadRequest)
+		ah.errorHandler(w, r, ErrBadLogin, http.StatusBadRequest)
 		return
 	}
 
 	id, err := ah.auther.Check(user, pass)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		var code = http.StatusInternalServerError
+		if err == ErrBadLogin {
+			code = http.StatusBadRequest
+		}
+		ah.errorHandler(w, r, err, code)
 		return
 	}
 
 	session.Values[userKey] = id
 	session.Values[userTimeout] = time.Now().Add(ah.lifetime)
 	if err := session.Save(r, w); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ah.errorHandler(w, r, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -175,14 +186,14 @@ func (ah Handler) AuthenticateRequest(r *http.Request) (interface{}, error) {
 func (ah Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	session, err := ah.store.Get(r, ah.sessionName)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ah.errorHandler(w, r, err, http.StatusInternalServerError)
 		return
 	}
 
 	session.Values[userTimeout] = time.Now().Add(-ah.lifetime)
 	session.Options.MaxAge = -1
 	if err := session.Save(r, w); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ah.errorHandler(w, r, err, http.StatusInternalServerError)
 		return
 	}
 

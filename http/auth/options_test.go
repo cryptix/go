@@ -1,8 +1,10 @@
 package auth
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -68,4 +70,30 @@ func TestOption_logout(t *testing.T) {
 	resp = testClient.PostForm("/logout", nil)
 	a.Equal(http.StatusSeeOther, resp.Code)
 	a.Equal(want, resp.Header().Get("Location"))
+}
+
+func TestOption_errhandler(t *testing.T) {
+
+	var errh = func(rw http.ResponseWriter, req *http.Request, err error, code int) {
+		rw.WriteHeader(code)
+		fmt.Fprintln(rw, "custom error:", code)
+		fmt.Fprintln(rw, err.Error())
+	}
+	testOptions = []Option{
+		SetErrorHandler(errh),
+	}
+	setup(t)
+	defer teardown()
+	a := assert.New(t)
+
+	testAuthProvider.checkMock = func(u, p string) (interface{}, error) {
+		return nil, fmt.Errorf("simulated database outage")
+	}
+
+	vals := url.Values{"user": {"testUser"}, "pass": {"testPassw"}}
+	resp := testClient.PostForm("/login", vals)
+
+	a.Equal(http.StatusInternalServerError, resp.Code)
+	body := resp.Body.String()
+	a.True(strings.HasPrefix(body, "custom error: 500"))
 }

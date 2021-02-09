@@ -64,9 +64,22 @@ func SetLifetime(d time.Duration) Option {
 	}
 }
 
+// SetNotAuthorizedHandler re-routes the _not authorized_ response to a different http handler
 func SetNotAuthorizedHandler(nah http.Handler) Option {
 	return func(h *Handler) error {
 		h.notAuthorizedHandler = nah
+		return nil
+	}
+}
+
+// ErrorHandler is used to for the SetErrorHandler option.
+// It is a classical http.HandleFunc plus the error and response code the auth system determained.
+type ErrorHandler func(rw http.ResponseWriter, req *http.Request, err error, code int)
+
+// SetErrorHandler can be used to customize the look up error responses
+func SetErrorHandler(errh ErrorHandler) Option {
+	return func(h *Handler) error {
+		h.errorHandler = errh
 		return nil
 	}
 }
