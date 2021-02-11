@@ -147,7 +147,6 @@ func (r *Renderer) Render(w http.ResponseWriter, req *http.Request, name string,
 	scopedTpl = scopedTpl.Funcs(scopedFuncs)
 
 	start := time.Now()
-	l := log.With(r.log, "tpl", name)
 	buf := r.bufpool.Get()
 
 	err = scopedTpl.ExecuteTemplate(buf, filepath.Base(r.baseTemplates[0]), data)
@@ -161,8 +160,8 @@ func (r *Renderer) Render(w http.ResponseWriter, req *http.Request, name string,
 	_, err = buf.WriteTo(w)
 
 	r.bufpool.Put(buf)
-	level.Debug(l).Log("event", "rendered",
-		"name", name,
+	level.Debug(r.log).Log("event", "rendered",
+		"tpl", name,
 		"status", status,
 		"took", time.Since(start),
 		"size", sz,
