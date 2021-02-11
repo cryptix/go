@@ -1,7 +1,6 @@
 package logging
 
 import (
-	"os"
 	"context"
 	"net/http"
 
@@ -22,9 +21,7 @@ func NewContext(ctx context.Context, log Interface) context.Context {
 func FromContext(ctx context.Context) Interface {
 	v, ok := ctx.Value(LogCTXKey).(Interface)
 	if !ok {
-		lw:=kitlog.NewSyncWriter(os.Stderr)
-		fallback:=kitlog.NewLogfmtLogger(lw)
-		return  kitlog.With(fallback, "warning", "no logger in context")
+		return nil
 	}
 	return v
 }
