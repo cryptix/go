@@ -17,25 +17,40 @@ import (
 type Tester struct {
 	mux http.Handler
 	t   *testing.T
+
+	extraHeaders http.Header
 }
 
 func New(mux *http.ServeMux, t *testing.T) *Tester {
 	l, _ := logtest.KitLogger("http/tester", t)
-	return &Tester{
+	tester := Tester{
 		mux: logging.InjectHandler(l)(mux),
 		t:   t,
 	}
+
+	tester.ClearHeaders()
+
+	return &tester
 }
 
-func (t *Tester) GetHTML(u string, h *http.Header) (*goquery.Document, *httptest.ResponseRecorder) {
+func (t *Tester) ClearHeaders() {
+	t.extraHeaders = make(http.Header)
+}
+
+func (t *Tester) SetHeaders(h http.Header) {
+	for k, vals := range h {
+		for _, v := range vals {
+			t.extraHeaders.Add(k, v)
+		}
+	}
+}
+
+func (t *Tester) GetHTML(u string) (*goquery.Document, *httptest.ResponseRecorder) {
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		t.t.Fatal(err)
 	}
-
-	if h != nil {
-		req.Header = *h
-	}
+	req.Header = t.extraHeaders.Clone()
 
 	rw := httptest.NewRecorder()
 	t.mux.ServeHTTP(rw, req)
@@ -47,15 +62,12 @@ func (t *Tester) GetHTML(u string, h *http.Header) (*goquery.Document, *httptest
 	return doc, rw
 }
 
-func (t *Tester) GetBody(u string, h *http.Header) (rw *httptest.ResponseRecorder) {
+func (t *Tester) GetBody(u string) (rw *httptest.ResponseRecorder) {
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		t.t.Fatal(err)
 	}
-
-	if h != nil {
-		req.Header = *h
-	}
+	req.Header = t.extraHeaders.Clone()
 
 	rw = httptest.NewRecorder()
 	t.mux.ServeHTTP(rw, req)
@@ -67,6 +79,7 @@ func (t *Tester) GetJSON(u string, v interface{}) (rw *httptest.ResponseRecorder
 	if err != nil {
 		t.t.Fatal(err)
 	}
+	req.Header = t.extraHeaders.Clone()
 
 	rw = httptest.NewRecorder()
 	t.mux.ServeHTTP(rw, req)
@@ -91,7 +104,7 @@ func (t *Tester) SendJSON(u string, v interface{}) (rw *httptest.ResponseRecorde
 	if err != nil {
 		t.t.Fatal(err)
 	}
-
+	req.Header = t.extraHeaders.Clone()
 	req.Header.Set("Content-Type", "application/json")
 
 	rw = httptest.NewRecorder()
@@ -104,6 +117,7 @@ func (t *Tester) PostForm(u string, v url.Values) (rw *httptest.ResponseRecorder
 	if err != nil {
 		t.t.Fatal(err)
 	}
+	req.Header = t.extraHeaders.Clone()
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	rw = httptest.NewRecorder()
