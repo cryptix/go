@@ -29,6 +29,14 @@ func BaseTemplates(bases ...string) Option {
 	}
 }
 
+// ErrorTemplate sets the filename of template that should be used for errors.
+func ErrorTemplate(name string) Option {
+	return func(r *Renderer) error {
+		r.errorTemplate = name
+		return nil
+	}
+}
+
 func FuncMap(m template.FuncMap) Option {
 	return func(r *Renderer) error {
 		r.funcMap = m

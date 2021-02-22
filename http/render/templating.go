@@ -23,6 +23,7 @@ type Renderer struct {
 	// files
 	templateFiles []string
 	baseTemplates []string
+	errorTemplate string
 
 	funcMap template.FuncMap
 
@@ -62,6 +63,11 @@ func New(fs http.FileSystem, opts ...Option) (*Renderer, error) {
 	if len(r.baseTemplates) == 0 {
 		r.baseTemplates = []string{"base.tmpl"}
 	}
+
+	if r.errorTemplate == "" {
+		r.errorTemplate = "/error.tmpl"
+	}
+
 	return r, r.parseHTMLTemplates()
 }
 
@@ -172,7 +178,7 @@ func (r *Renderer) Render(w http.ResponseWriter, req *http.Request, name string,
 func (r *Renderer) Error(w http.ResponseWriter, req *http.Request, status int, err error) {
 	r.logError(req, err, nil)
 	w.Header().Set("cache-control", "no-cache")
-	err2 := r.Render(w, req, "/error.tmpl", status, map[string]interface{}{
+	err2 := r.Render(w, req, r.errorTemplate, status, map[string]interface{}{
 		"StatusCode": status,
 		"Status":     http.StatusText(status),
 		"Err":        err,
